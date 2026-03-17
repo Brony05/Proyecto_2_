@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Login JWT</title>
+
+<style>
+
+body{
+font-family: Arial;
+background-color:#f4f4f4;
+text-align:center;
+margin-top:80px;
+}
+
+.container{
+width:320px;
+margin:auto;
+background:white;
+padding:25px;
+border-radius:10px;
+box-shadow:0px 0px 10px rgba(0,0,0,0.2);
+}
+
+input{
+width:90%;
+padding:10px;
+margin:10px;
+}
+
+button{
+background:#2c7be5;
+color:white;
+border:none;
+padding:10px 20px;
+cursor:pointer;
+border-radius:5px;
+}
+
+button:hover{
+background:#1a5ed6;
+}
+
+#resultado{
+margin-top:20px;
+color:green;
+font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Login API JWT</h2>
+
+<input type="text" id="username" placeholder="Usuario">
+
+<input type="password" id="password" placeholder="Contraseña">
+
+<button onclick="login()">Ingresar</button>
+
+<br><br>
+
+<button onclick="consultarAPI()">Consultar API</button>
+
+<p id="resultado"></p>
+
+</div>
+
+<script>
+
+let token="";
+
+function login(){
+
+let user=document.getElementById("username").value;
+let pass=document.getElementById("password").value;
+
+fetch("http://localhost:8080/auth/login",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+username:user,
+password:pass
+})
+
+})
+
+.then(response=>response.json())
+
+.then(data=>{
+
+token=data.token;
+console.log("TOKEN:",token);
+
+document.getElementById("resultado").innerHTML=
+"Token recibido correctamente";
+
+})
+
+.catch(error=>{
+
+document.getElementById("resultado").innerHTML=
+"Error en login";
+
+});
+
+}
+
+function consultarAPI(){
+
+fetch("http://localhost:8080/api/mensaje",{
+
+method:"GET",
+
+headers:{
+"Authorization":"Bearer "+token
+}
+
+})
+
+.then(response=>response.text())
+
+.then(data=>{
+
+document.getElementById("resultado").innerHTML=data;
+
+})
+
+.catch(error=>{
+
+document.getElementById("resultado").innerHTML="Acceso denegado";
+
+});
+
+}
+
+</script>
+
+</body>
+</html>
