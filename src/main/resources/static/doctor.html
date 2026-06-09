@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor - Consultorio Psiquiátrico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/es.js"></script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="light-mode">
+	<style>
+	    /* Estilos adicionales para la lista de pacientes */
+	    .paciente-item {
+	        cursor: pointer;
+	        padding: 12px 15px;
+	        margin-bottom: 8px;
+	        border-radius: 10px;
+	        background: white;
+	        border: 1px solid #e0e0e0;
+	        transition: all 0.2s;
+	        display: flex;
+	        align-items: center;
+	        gap: 10px;
+	    }
+	    
+	    .paciente-item:hover {
+	        background-color: #f0f2f5;
+	        transform: translateX(5px);
+	    }
+	    
+	    .paciente-item.selected {
+	        background-color: #e8f4fd;
+	        border-left: 4px solid #28a745;
+	    }
+	    
+	    .nota-card {
+	        background: #f8f9fa;
+	        border-radius: 12px;
+	        padding: 15px;
+	        margin-bottom: 12px;
+	        border-left: 4px solid #667eea;
+	    }
+	</style>
+	
+    <div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+
+    <nav class="navbar navbar-custom">
+        <div class="container-fluid">
+            <span class="navbar-brand text-primary fw-bold"><i class="fas fa-user-md"></i> Panel Doctor</span>
+            <div class="d-flex align-items-center gap-2">
+                <span><i class="fas fa-stethoscope text-primary"></i> <span id="doctorName"></span></span>
+                <span class="badge bg-info" id="doctorEspecialidad"></span>
+                <button onclick="logout()" class="btn btn-outline-danger btn-sm"><i class="fas fa-sign-out-alt"></i> Salir</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><button class="nav-link active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="calendario"><i class="fas fa-calendar-alt"></i> Calendario</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="citas"><i class="fas fa-list"></i> Mis Citas</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="pacientes"><i class="fas fa-users"></i> Mis Pacientes</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="notas"><i class="fas fa-notes-medical"></i> Notas Médicas</button></li>
+			<!-- En los tabs, agregar -->
+		<li class="nav-item"><button class="nav-link" data-tab="ia"><i class="fas fa-brain"></i> Asistente IA</button></li>
+        </ul>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="tab-content">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <i class="fas fa-calendar-check"></i>
+                        <div class="number" id="citasHoy">0</div>
+                        <div class="label">Citas Hoy</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <i class="fas fa-spinner"></i>
+                        <div class="number" id="citasProgreso">0</div>
+                        <div class="label">En Progreso</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <i class="fas fa-check-circle"></i>
+                        <div class="number" id="citasCompletadas">0</div>
+                        <div class="label">Completadas</div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-container mt-3">
+                <h5><i class="fas fa-clock"></i> Próximas Citas</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Paciente</th>
+                                <th>Servicio</th>
+                                <th>Acompañante</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyProximasCitas"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- CALENDARIO -->
+        <div id="calendario" class="tab-content" style="display:none;">
+            <div class="calendar-container">
+                <div id="calendar"></div>
+            </div>
+        </div>
+
+        <!-- MIS CITAS -->
+        <div id="citas" class="tab-content" style="display:none;">
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-3">
+                        <input type="date" id="filtroFecha" class="form-control" placeholder="Filtrar por fecha">
+                    </div>
+                    <div class="col-md-3">
+                        <select id="filtroEstado" class="form-select">
+                            <option value="">Todos los estados</option>
+                            <option value="AGENDADA">Agendada</option>
+                            <option value="EN_PROGRESO">En Progreso</option>
+                            <option value="COMPLETADA">Completada</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select id="filtroEspecialidad" class="form-select">
+                            <option value="">Todas las especialidades</option>
+                            <option value="Psicología Clínica">Psicología Clínica</option>
+                            <option value="Psiquiatría">Psiquiatría</option>
+                            <option value="Terapia de Pareja">Terapia de Pareja</option>
+                            <option value="Psicología Infantil">Psicología Infantil</option>
+                            <option value="Neuropsicología">Neuropsicología</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary" onclick="cargarCitasDoctor()"><i class="fas fa-search"></i> Filtrar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Paciente</th>
+                                <th>Servicio</th>
+                                <th>Teléfono</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyCitasDoctor"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIS PACIENTES -->
+        <div id="pacientes" class="tab-content" style="display:none;">
+            <div class="filter-section">
+                <div class="row">
+                    <div class="col-md-6">
+                        <input type="text" id="buscarPaciente" class="form-control" placeholder="Buscar paciente...">
+                    </div>
+                    <div class="col-md-6">
+                        <button class="btn btn-primary" onclick="cargarPacientesDoctor()"><i class="fas fa-search"></i> Buscar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th>Correo</th>
+                                <th>Total Citas</th>
+                                <th>Última Cita</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyPacientesDoctor"></tbody>
+                    </table>
+                </div>
+            </div>
+			
+        </div>
+
+		<!-- Sección de NOTAS MÉDICAS - Reemplazar completamente -->
+		<!-- Reemplaza la sección de NOTAS MÉDICAS completa con esto -->
+		<div id="notas" class="tab-content" style="display:none;">
+		    <div class="row">
+		        <div class="col-md-4">
+		            <div class="table-container">
+		                <h5><i class="fas fa-user"></i> Seleccionar Paciente</h5>
+		                <input type="text" id="buscarPacienteNota" class="form-control mb-3" placeholder="Buscar paciente por nombre...">
+		                <div id="listaPacientesNota" style="max-height: 450px; overflow-y: auto;">
+		                    <div class="text-center text-muted p-3">Cargando pacientes...</div>
+		                </div>
+		            </div>
+		        </div>
+		        <div class="col-md-8">
+		            <div class="table-container">
+		                <h5><i class="fas fa-notes-medical"></i> Notas Médicas</h5>
+		                <div id="notasPacienteContainer" style="max-height: 300px; overflow-y: auto;">
+		                    <div class="alert alert-info">Selecciona un paciente para ver sus notas</div>
+		                </div>
+		                <hr>
+		                <h5><i class="fas fa-plus-circle"></i> Agregar Nota</h5>
+		                <input type="hidden" id="notaPacienteId">
+		                <div id="pacienteSeleccionadoInfo" class="alert alert-success mb-3" style="display:none;">
+		                    <i class="fas fa-check-circle"></i> <strong>Paciente seleccionado:</strong> <span id="pacienteSeleccionadoNombre"></span>
+		                </div>
+		                <div class="mb-3">
+		                    <label class="form-label">Tipo de nota *</label>
+		                    <select id="notaTipo" class="form-select">
+		                        <option value="">📌 Seleccionar tipo</option>
+		                        <option value="DIAGNOSTICO">📋 Diagnóstico</option>
+		                        <option value="RECOMENDACION">💡 Recomendación</option>
+		                        <option value="MEDICAMENTO">💊 Medicamento recetado</option>
+		                        <option value="CONSEJO">❤️ Consejo para el paciente</option>
+		                    </select>
+		                </div>
+		                <div class="mb-3">
+		                    <label class="form-label">Contenido *</label>
+		                    <textarea id="notaContenido" class="form-control" rows="4" placeholder="Escribe aquí el diagnóstico, recomendación, medicamento o consejo..."></textarea>
+		                </div>
+		                <button class="btn btn-primary" onclick="guardarNotaMedica()" id="btnGuardarNota" disabled>
+		                    <i class="fas fa-save"></i> Guardar Nota
+		                </button>
+		            </div>
+		        </div>
+		    </div>
+		</div>
+    </div>
+
+    <!-- Modal Iniciar Consulta -->
+    <div class="modal fade" id="iniciarCitaModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-play-circle"></i> Iniciar Consulta</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="cronometro-container">
+                        <div class="cronometro-tiempo" id="cronometroTiempo">00:00</div>
+                        <div class="mt-2">
+                            <label class="text-white">Tiempo programado:</label>
+                            <select id="tiempoProgramado" class="form-select mb-2" style="width: auto; margin: 0 auto;">
+                                <option value="30">30 minutos</option>
+                                <option value="45" selected>45 minutos</option>
+                                <option value="60">60 minutos</option>
+                                <option value="90">90 minutos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button class="btn btn-success btn-cronometro" id="btnIniciarCrono">Iniciar</button>
+                            <button class="btn btn-warning btn-cronometro" id="btnPausarCrono" disabled>Pausar</button>
+                            <button class="btn btn-danger btn-cronometro" id="btnReiniciarCrono" disabled>Reiniciar</button>
+                        </div>
+                        <div class="mt-3" id="alertaTiempo" style="display:none;">
+                            <span class="badge bg-warning">Quedan menos de 5 minutos</span>
+                        </div>
+                    </div>
+                    <hr>
+                    <div>
+                        <label>Extender tiempo (costo extra)</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <select id="extenderTiempo" class="form-select">
+                                    <option value="15">+15 minutos - $200</option>
+                                    <option value="30">+30 minutos - $350</option>
+                                    <option value="60">+60 minutos - $600</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-info w-100" onclick="extenderTiempo()">Extender</button>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div>
+                        <label>Notas de la consulta</label>
+                        <textarea id="notasConsulta" class="form-control" rows="3" placeholder="Registra observaciones..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-success" onclick="finalizarConsulta()">Finalizar Consulta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/doctor.js"></script>
+	
+
+	
+	<!-- ==================== PANEL IA PARA DOCTOR ==================== -->
+	<style>
+	    .ia-panel-container {
+	        background: white;
+	        border-radius: 20px;
+	        padding: 20px;
+	        margin-bottom: 25px;
+	        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+	    }
+	    .ia-resultado {
+	        background: #f8f9fa;
+	        padding: 20px;
+	        border-radius: 10px;
+	        min-height: 350px;
+	        overflow-y: auto;
+	        white-space: pre-wrap;
+	        line-height: 1.6;
+	        font-family: inherit;
+	    }
+	    .ia-loading {
+	        text-align: center;
+	        padding: 50px;
+	        color: #667eea;
+	    }
+	    .ia-error {
+	        color: #dc3545;
+	        background: #ffe6e6;
+	        padding: 15px;
+	        border-radius: 10px;
+	        border-left: 4px solid #dc3545;
+	    }
+	    .diagnostico-box {
+	        background: #e3f2fd;
+	        border-left: 4px solid #2196f3;
+	        padding: 15px;
+	        border-radius: 10px;
+	        margin-bottom: 15px;
+	    }
+	    .recomendacion-box {
+	        background: #e8f5e9;
+	        border-left: 4px solid #4caf50;
+	        padding: 15px;
+	        border-radius: 10px;
+	        margin-bottom: 15px;
+	    }
+	    .consejo-box {
+	        background: #fff3e0;
+	        border-left: 4px solid #ff9800;
+	        padding: 15px;
+	        border-radius: 10px;
+	        margin-bottom: 15px;
+	    }
+	    .separador-ia {
+	        border-top: 2px dashed #ccc;
+	        margin: 20px 0;
+	    }
+	    .btn-diagnostico { background: #2196f3; color: white; border: none; }
+	    .btn-recomendacion { background: #4caf50; color: white; border: none; }
+	    .btn-consejo { background: #ff9800; color: white; border: none; }
+	    .btn-diagnostico:hover, .btn-recomendacion:hover, .btn-consejo:hover { opacity: 0.9; }
+	</style>
+
+	
+
+	<!-- ==================== PANEL IA PARA DOCTOR (MEJORADO) ==================== -->
+	<style>
+	    .ia-panel-container {
+	        background: white;
+	        border-radius: 20px;
+	        padding: 20px;
+	        margin-bottom: 25px;
+	        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+	    }
+	    .ia-resultado {
+	        background: #f8f9fa;
+	        padding: 20px;
+	        border-radius: 10px;
+	        min-height: 350px;
+	        overflow-y: auto;
+	        white-space: pre-wrap;
+	        line-height: 1.6;
+	        font-family: inherit;
+	    }
+	    .ia-loading {
+	        text-align: center;
+	        padding: 50px;
+	        color: #667eea;
+	    }
+	    .ia-error {
+	        color: #dc3545;
+	        background: #ffe6e6;
+	        padding: 15px;
+	        border-radius: 10px;
+	        border-left: 4px solid #dc3545;
+	    }
+	    .diagnostico-box {
+	        background: #e3f2fd;
+	        border-left: 4px solid #2196f3;
+	        padding: 15px;
+	        border-radius: 10px;
+	        margin-bottom: 15px;
+	    }
+	    .tratamiento-box {
+	        background: #e8f5e9;
+	        border-left: 4px solid #4caf50;
+	        padding: 15px;
+	        border-radius: 10px;
+	        margin-bottom: 15px;
+	    }
+	    .consejos-box {
+	        background: #fff3e0;
+	        border-left: 4px solid #ff9800;
+	        padding: 15px;
+	        border-radius: 10px;
+	        margin-bottom: 15px;
+	    }
+	    .separador-ia {
+	        border-top: 2px dashed #ccc;
+	        margin: 20px 0;
+	    }
+	    .btn-diagnostico { background: #2196f3; color: white; border: none; border-radius: 10px; padding: 10px; }
+	    .btn-tratamiento { background: #4caf50; color: white; border: none; border-radius: 10px; padding: 10px; }
+	    .btn-consejos { background: #ff9800; color: white; border: none; border-radius: 10px; padding: 10px; }
+	    .btn-diagnostico:hover, .btn-tratamiento:hover, .btn-consejos:hover { opacity: 0.9; transform: translateY(-2px); }
+	</style>
+
+	<!-- Agregar en el menú de tabs -->
+	<li class="nav-item"><button class="nav-link" data-tab="ia"><i class="fas fa-brain"></i> Asistente IA</button></li>
+
+	<!-- Contenido de la pestaña IA -->
+	<div id="ia" class="tab-content" style="display:none;">
+	    <div class="row">
+	        <div class="col-md-5">
+	            <div class="ia-panel-container">
+	                <h5><i class="fas fa-stethoscope"></i> Generar Contenido con IA</h5>
+	                <div class="mb-3">
+	                    <label class="form-label">Seleccionar Paciente</label>
+	                    <select id="iaPacienteId" class="form-select">
+	                        <option value="">📋 Seleccionar paciente</option>
+	                    </select>
+	                </div>
+	                <div class="mb-3">
+	                    <label class="form-label">Diagnóstico / Condición</label>
+	                    <input type="text" id="iaDiagnostico" class="form-control" placeholder="Ej: Trastorno de ansiedad generalizada">
+	                </div>
+	                <div class="mb-3">
+	                    <label class="form-label">Síntomas principales</label>
+	                    <textarea id="iaSintomas" class="form-control" rows="3" placeholder="Describe los síntomas..."></textarea>
+	                </div>
+	                <button class="btn btn-primary w-100" onclick="generarContenidoIA()">
+	                    <i class="fas fa-magic"></i> Generar con IA
+	                </button>
+	                <hr>
+	                <div class="mt-3">
+	                    <label class="form-label">O pregúntale a la IA</label>
+	                    <div class="input-group">
+	                        <input type="text" id="iaPregunta" class="form-control" placeholder="Escribe tu pregunta...">
+	                        <button class="btn btn-outline-primary" onclick="preguntarIA()">Preguntar</button>
+	                    </div>
+	                </div>
+	            </div>
+	        </div>
+	        <div class="col-md-7">
+	            <div class="ia-panel-container">
+	                <h5><i class="fas fa-notes-medical"></i> Contenido Generado</h5>
+	                <div id="iaResultado" class="ia-resultado">
+	                    <p class="text-muted text-center">Completa el formulario y haz clic en "Generar con IA"</p>
+	                </div>
+	                <div class="separador-ia"></div>
+	                <div class="row g-2">
+	                    <div class="col-md-4">
+	                        <button class="btn btn-diagnostico w-100" onclick="guardarDiagnostico()" id="btnGuardarDiagnostico" style="display: none;">
+	                            <i class="fas fa-stethoscope"></i> Guardar Diagnóstico
+	                        </button>
+	                    </div>
+	                    <div class="col-md-4">
+	                        <button class="btn btn-tratamiento w-100" onclick="guardarTratamiento()" id="btnGuardarTratamiento" style="display: none;">
+	                            <i class="fas fa-notes-medical"></i> Guardar Recomendación
+	                        </button>
+	                    </div>
+	                    <div class="col-md-4">
+	                        <button class="btn btn-consejos w-100" onclick="guardarConsejos()" id="btnGuardarConsejos" style="display: none;">
+	                            <i class="fas fa-heart"></i> Guardar Consejos
+	                        </button>
+	                    </div>
+	                </div>
+	            </div>
+	        </div>
+	    </div>
+	</div>
+
+	<script>
+	// ==================== IA PARA DOCTOR ====================
+	let contenidoGenerado = {
+	    diagnostico: null,
+	    tratamiento: null,
+	    consejos: null
+	};
+	let pacienteSeleccionadoId = null;
+	let pacienteSeleccionadoNombre = null;
+	let listaPacientes = [];
+
+	async function cargarPacientesIA() {
+	    try {
+	        const res = await authFetch('/api/clientes');
+	        if (res.ok) {
+	            listaPacientes = await res.json();
+	            const select = document.getElementById('iaPacienteId');
+	            select.innerHTML = '<option value="">📋 Seleccionar paciente</option>' + 
+	                listaPacientes.map(p => `<option value="${p.id}">👤 ${p.nombre}</option>`).join('');
+	        }
+	    } catch(e) {
+	        console.error("Error cargando pacientes:", e);
+	    }
+	}
+
+	async function generarContenidoIA() {
+	    const pacienteId = document.getElementById('iaPacienteId').value;
+	    const diagnostico = document.getElementById('iaDiagnostico').value;
+	    const sintomas = document.getElementById('iaSintomas').value;
+	    
+	    if (!pacienteId) {
+	        mostrarMensaje('❌ Selecciona un paciente', 'danger');
+	        return;
+	    }
+	    if (!diagnostico) {
+	        mostrarMensaje('❌ Escribe un diagnóstico', 'danger');
+	        return;
+	    }
+	    
+	    pacienteSeleccionadoId = parseInt(pacienteId);
+	    const paciente = listaPacientes.find(p => p.id == pacienteId);
+	    pacienteSeleccionadoNombre = paciente ? paciente.nombre : 'Paciente';
+	    
+	    setLoading(true);
+	    const resultadoDiv = document.getElementById('iaResultado');
+	    resultadoDiv.innerHTML = '<div class="ia-loading"><i class="fas fa-spinner fa-spin"></i> 🤖 Generando contenido con IA...<br><small>Esto puede tomar unos segundos</small></div>';
+	    
+	    try {
+	        const res = await authFetch('/api/ia/recomendar-tratamiento', {
+	            method: 'POST',
+	            body: JSON.stringify({ 
+	                diagnostico: diagnostico, 
+	                sintomas: sintomas,
+	                historial: ""
+	            })
+	        });
+	        
+	        if (res.ok) {
+	            const data = await res.json();
+	            let respuesta = data.recomendacion;
+	            
+	            console.log("Respuesta de IA:", respuesta);
+	            
+	            // Extraer secciones
+	            let diagnosticoExtraido = null;
+	            let tratamientoExtraido = null;
+	            let consejosExtraidos = null;
+	            
+	            // Buscar sección DIAGNOSTICO
+	            const diagMatch = respuesta.match(/===DIAGNOSTICO===\s*\n([\s\S]*?)(?=\n===|$)/i);
+	            if (diagMatch) {
+	                diagnosticoExtraido = diagMatch[1].trim();
+	            }
+	            
+	            // Buscar sección TRATAMIENTO
+	            const trataMatch = respuesta.match(/===TRATAMIENTO===\s*\n([\s\S]*?)(?=\n===|$)/i);
+	            if (trataMatch) {
+	                tratamientoExtraido = trataMatch[1].trim();
+	            }
+	            
+	            // Buscar sección CONSEJOS
+	            const consMatch = respuesta.match(/===CONSEJOS===\s*\n([\s\S]*?)(?=\n===|$)/i);
+	            if (consMatch) {
+	                consejosExtraidos = consMatch[1].trim();
+	            }
+	            
+	            // Si no se encontró diagnóstico, usar el ingresado
+	            contenidoGenerado.diagnostico = diagnosticoExtraido || diagnostico;
+	            contenidoGenerado.tratamiento = tratamientoExtraido || "";
+	            contenidoGenerado.consejos = consejosExtraidos || "";
+	            
+	            resultadoDiv.innerHTML = `
+	                <div class="diagnostico-box">
+	                    <h6><i class="fas fa-stethoscope text-primary"></i> DIAGNÓSTICO</h6>
+	                    <p>${contenidoGenerado.diagnostico.replace(/\n/g, '<br>')}</p>
+	                </div>
+	                <div class="tratamiento-box">
+	                    <h6><i class="fas fa-notes-medical text-success"></i> PLAN DE TRATAMIENTO</h6>
+	                    <p>${contenidoGenerado.tratamiento ? contenidoGenerado.tratamiento.replace(/\n/g, '<br>') : 'No se generó tratamiento'}</p>
+	                </div>
+	                <div class="consejos-box">
+	                    <h6><i class="fas fa-heart text-warning"></i> CONSEJOS PRÁCTICOS</h6>
+	                    <p>${contenidoGenerado.consejos ? contenidoGenerado.consejos.replace(/\n/g, '<br>') : 'No se generaron consejos'}</p>
+	                </div>
+	            `;
+	            
+	            document.getElementById('btnGuardarDiagnostico').style.display = 'block';
+	            document.getElementById('btnGuardarTratamiento').style.display = contenidoGenerado.tratamiento ? 'block' : 'none';
+	            document.getElementById('btnGuardarConsejos').style.display = contenidoGenerado.consejos ? 'block' : 'none';
+	            
+	            mostrarMensaje('✅ Contenido generado exitosamente', 'success');
+	        } else {
+	            const error = await res.text();
+	            resultadoDiv.innerHTML = `<div class="ia-error">❌ Error al generar contenido: ${error}</div>`;
+	        }
+	    } catch(e) {
+	        console.error("Error:", e);
+	        resultadoDiv.innerHTML = `<div class="ia-error">❌ Error de conexión: ${e.message}</div>`;
+	    }
+	    setLoading(false);
+	}
+
+	async function guardarDiagnostico() {
+	    if (!pacienteSeleccionadoId || !contenidoGenerado.diagnostico) {
+	        mostrarMensaje('❌ No hay diagnóstico para guardar', 'danger');
+	        return;
+	    }
+	    
+	    setLoading(true);
+	    try {
+	        const res = await authFetch('/api/notas', {
+	            method: 'POST',
+	            body: JSON.stringify({
+	                pacienteId: pacienteSeleccionadoId,
+	                tipo: 'DIAGNOSTICO',
+	                diagnostico: contenidoGenerado.diagnostico
+	            })
+	        });
+	        
+	        if (res.ok) {
+	            mostrarMensaje('✅ Diagnóstico guardado correctamente', 'success');
+	            document.getElementById('btnGuardarDiagnostico').style.display = 'none';
+	            localStorage.setItem('ultimoDiagnostico', contenidoGenerado.diagnostico);
+	        } else {
+	            const error = await res.text();
+	            mostrarMensaje('❌ Error: ' + error, 'danger');
+	        }
+	    } catch(e) {
+	        mostrarMensaje('❌ Error de conexión', 'danger');
+	    }
+	    setLoading(false);
+	}
+
+	async function guardarTratamiento() {
+	    if (!pacienteSeleccionadoId || !contenidoGenerado.tratamiento) {
+	        mostrarMensaje('❌ No hay tratamiento para guardar', 'danger');
+	        return;
+	    }
+	    
+	    setLoading(true);
+	    try {
+	        const res = await authFetch('/api/notas', {
+	            method: 'POST',
+	            body: JSON.stringify({
+	                pacienteId: pacienteSeleccionadoId,
+	                tipo: 'RECOMENDACION',
+	                recomendaciones: contenidoGenerado.tratamiento
+	            })
+	        });
+	        
+	        if (res.ok) {
+	            mostrarMensaje('✅ Plan de tratamiento guardado correctamente', 'success');
+	            document.getElementById('btnGuardarTratamiento').style.display = 'none';
+	        } else {
+	            const error = await res.text();
+	            mostrarMensaje('❌ Error: ' + error, 'danger');
+	        }
+	    } catch(e) {
+	        mostrarMensaje('❌ Error de conexión', 'danger');
+	    }
+	    setLoading(false);
+	}
+
+	async function guardarConsejos() {
+	    if (!pacienteSeleccionadoId || !contenidoGenerado.consejos) {
+	        mostrarMensaje('❌ No hay consejos para guardar', 'danger');
+	        return;
+	    }
+	    
+	    setLoading(true);
+	    try {
+	        const res = await authFetch('/api/notas', {
+	            method: 'POST',
+	            body: JSON.stringify({
+	                pacienteId: pacienteSeleccionadoId,
+	                tipo: 'CONSEJO',
+	                recomendaciones: contenidoGenerado.consejos
+	            })
+	        });
+	        
+	        if (res.ok) {
+	            mostrarMensaje('✅ Consejos guardados correctamente', 'success');
+	            document.getElementById('btnGuardarConsejos').style.display = 'none';
+	        } else {
+	            const error = await res.text();
+	            mostrarMensaje('❌ Error: ' + error, 'danger');
+	        }
+	    } catch(e) {
+	        mostrarMensaje('❌ Error de conexión', 'danger');
+	    }
+	    setLoading(false);
+	}
+
+	async function preguntarIA() {
+	    const pregunta = document.getElementById('iaPregunta').value;
+	    if (!pregunta) {
+	        mostrarMensaje('❌ Escribe una pregunta', 'danger');
+	        return;
+	    }
+	    
+	    setLoading(true);
+	    const resultadoDiv = document.getElementById('iaResultado');
+	    resultadoDiv.innerHTML = '<div class="ia-loading"><i class="fas fa-spinner fa-spin"></i> 🤖 Consultando a la IA...</div>';
+	    
+	    try {
+	        const res = await authFetch('/api/ia/chat', {
+	            method: 'POST',
+	            body: JSON.stringify({ mensaje: pregunta, contexto: 'Contexto médico para psiquiatras' })
+	        });
+	        
+	        if (res.ok) {
+	            const data = await res.json();
+	            resultadoDiv.innerHTML = `
+	                <div class="alert alert-info">
+	                    <strong>📝 Pregunta:</strong> ${pregunta}
+	                </div>
+	                <div class="mt-3">
+	                    <h6>🤖 RESPUESTA:</h6>
+	                    <hr>
+	                    <div style="white-space: pre-wrap;">${data.respuesta.replace(/\n/g, '<br>')}</div>
+	                </div>
+	            `;
+	            document.getElementById('iaPregunta').value = '';
+	        } else {
+	            resultadoDiv.innerHTML = '<div class="ia-error">❌ Error en la consulta</div>';
+	        }
+	    } catch(e) {
+	        resultadoDiv.innerHTML = `<div class="ia-error">❌ Error de conexión: ${e.message}</div>`;
+	    }
+	    setLoading(false);
+	}
+
+	// Evento al seleccionar paciente
+	document.getElementById('iaPacienteId')?.addEventListener('change', function() {
+	    const pacienteId = this.value;
+	    if (pacienteId) {
+	        const paciente = listaPacientes.find(p => p.id == pacienteId);
+	        if (paciente) {
+	            pacienteSeleccionadoId = parseInt(pacienteId);
+	            pacienteSeleccionadoNombre = paciente.nombre;
+	        }
+	    } else {
+	        pacienteSeleccionadoId = null;
+	    }
+	});
+
+	// Cargar pacientes al cambiar a la pestaña IA
+	const iaTabButton = document.querySelector('[data-tab="ia"]');
+	if (iaTabButton) {
+	    iaTabButton.addEventListener('click', () => {
+	        cargarPacientesIA();
+	        document.getElementById('iaResultado').innerHTML = '<p class="text-muted text-center">Completa el formulario y haz clic en "Generar con IA"</p>';
+	        document.getElementById('btnGuardarDiagnostico').style.display = 'none';
+	        document.getElementById('btnGuardarTratamiento').style.display = 'none';
+	        document.getElementById('btnGuardarConsejos').style.display = 'none';
+	        document.getElementById('iaDiagnostico').value = '';
+	        document.getElementById('iaSintomas').value = '';
+	        contenidoGenerado = { diagnostico: null, tratamiento: null, consejos: null };
+	    });
+	}
+	</script>		
+	</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Consultorio Psiquiátrico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="light-mode">
+    <div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+
+    <div class="d-flex align-items-center justify-content-center min-vh-100">
+        <div class="login-container">
+            <div class="login-card">
+                <h2><i class="fas fa-brain"></i> Consultorio Psiquiátrico</h2>
+                
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="fas fa-user"></i></span>
+                            <input type="text" id="username" class="form-control" placeholder="Usuario" required autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="fas fa-lock"></i></span>
+                            <input type="password" id="password" class="form-control" placeholder="Contraseña" required>
+                        </div>
+                    </div>
+                    <button type="submit" id="btnLogin"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</button>
+                    <div id="errorMsg" class="text-danger mt-3 text-center small"></div>
+                </form>
+
+                <div class="separador"><span>o</span></div>
+
+                <button type="button" class="btn-registro" onclick="window.location.href='/registro.html'">
+                    <i class="fas fa-user-plus"></i> ¿Nuevo paciente? Regístrate aquí
+                </button>
+
+                <div class="mt-4 pt-3 border-top">
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Token -->
+    <div class="modal fade token-modal" id="tokenModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header"><h5><i class="fas fa-key"></i> Token JWT Generado</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="alert alert-info"><strong>¡Autenticación exitosa!</strong> Serás redirigido en <span id="contador">5</span> segundos.</div>
+                    <div class="info-usuario" id="infoUsuario"></div>
+                    <div class="token-container">
+                        <button class="btn-copiar" onclick="copiarToken()"><i class="fas fa-copy"></i> Copiar</button>
+                        <code id="tokenTexto"></code>
+                    </div>
+                    <div class="progress-bar-container" id="progressBar"><div class="progress-bar-fill"></div></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button class="btn btn-primary" onclick="redirigirAhora()">Ir al Dashboard ahora</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/utils.js"></script>
+    <script>
+        let timeoutRedireccion;
+        
+        function copiarToken() {
+            const tokenTexto = document.getElementById('tokenTexto').innerText;
+            navigator.clipboard.writeText(tokenTexto).then(() => mostrarMensaje('✅ Token copiado', 'success'));
+        }
+        
+        function redirigirAhora() {
+            if (timeoutRedireccion) clearTimeout(timeoutRedireccion);
+            const rol = localStorage.getItem('rol');
+            if (rol === 'ADMIN') window.location.href = '/admin.html';
+            else if (rol === 'EMPLEADO') window.location.href = '/empleado.html';
+            else if (rol === 'PACIENTE') window.location.href = '/paciente.html';
+            else if (rol === 'DOCTOR') window.location.href = '/doctor.html';
+            else window.location.href = '/';
+        }
+        
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            setLoading(true);
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.username);
+                    localStorage.setItem('rol', data.rol);
+                    if (data.especialidad) localStorage.setItem('especialidad', data.especialidad);
+                    
+                    let rolBadge = '';
+                    if (data.rol === 'ADMIN') rolBadge = '<span class="badge-rol badge-admin">ADMINISTRADOR</span>';
+                    else if (data.rol === 'EMPLEADO') rolBadge = '<span class="badge-rol badge-empleado">EMPLEADO</span>';
+                    else if (data.rol === 'PACIENTE') rolBadge = '<span class="badge-rol badge-paciente">PACIENTE</span>';
+                    else if (data.rol === 'DOCTOR') rolBadge = '<span class="badge-rol badge-doctor">DOCTOR</span>';
+                    
+                    document.getElementById('infoUsuario').innerHTML = `<div class="row"><div class="col-6"><strong>Usuario:</strong><br><code>${data.username}</code></div><div class="col-6"><strong>Rol:</strong><br>${rolBadge}</div></div>`;
+                    document.getElementById('tokenTexto').innerHTML = data.token.substring(0, 100) + '...';
+                    document.getElementById('tokenTexto').setAttribute('data-full-token', data.token);
+                    new bootstrap.Modal(document.getElementById('tokenModal')).show();
+                    
+                    let segundos = 5;
+                    const intervalo = setInterval(() => {
+                        segundos--;
+                        document.getElementById('contador').innerText = segundos;
+                        if (segundos <= 0) { clearInterval(intervalo); redirigirAhora(); }
+                    }, 1000);
+                    timeoutRedireccion = setTimeout(() => redirigirAhora(), 5000);
+                } else {
+                    document.getElementById('errorMsg').innerText = '❌ Credenciales inválidas';
+                }
+            } catch (error) {
+                document.getElementById('errorMsg').innerText = '❌ Error de conexión';
+            }
+            setLoading(false);
+        });
+        
+        const existingToken = localStorage.getItem('token');
+        if (existingToken) {
+            const rol = localStorage.getItem('rol');
+            setTimeout(() => redirigirAhora(), 1000);
+        }
+    </script>
+</body>
+</html>
