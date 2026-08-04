@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrativo - Consultorio Psiquiátrico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body.light-mode {
+            background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-custom { background: linear-gradient(135deg, #283593 0%, #1a237e 100%); padding: 15px 20px; }
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #283593, #1a237e);
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card i { font-size: 45px; color: #283593; margin-bottom: 15px; }
+        .stat-card .number { font-size: 36px; font-weight: bold; }
+        .stat-card .label { color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .table-container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-x: auto; }
+        .table thead th { background: linear-gradient(135deg, #283593 0%, #1a237e 100%); color: white; border: none; padding: 12px; }
+        .filter-section { background: white; border-radius: 15px; padding: 15px 20px; margin-bottom: 20px; }
+        .btn-primary-custom { background: linear-gradient(135deg, #283593 0%, #1a237e 100%); border: none; border-radius: 10px; padding: 10px 25px; font-weight: 600; color: white; }
+        .nav-tabs .nav-link.active { background: linear-gradient(135deg, #283593 0%, #1a237e 100%); color: white; }
+        .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; }
+        .alert-custom { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideIn 0.3s ease; border-radius: 12px; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0%); opacity: 1; } }
+        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #283593 0%, #1a237e 100%); color: white; border: none; cursor: pointer; z-index: 1000; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .theme-toggle:hover { transform: scale(1.1); }
+        .factura-card { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #283593; }
+        .btn-sm { margin: 2px; }
+    </style>
+</head>
+<body class="light-mode">
+
+<div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+
+<nav class="navbar navbar-custom">
+    <div class="container-fluid">
+        <span class="navbar-brand text-white"><i class="fas fa-file-invoice"></i> Panel Administrativo</span>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-white"><i class="fas fa-user-tie"></i> <span id="userName" class="fw-bold"></span></div>
+            <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-sign-out-alt"></i> Salir</button>
+        </div>
+    </div>
+</nav>
+
+<button class="theme-toggle" onclick="toggleModoOscuro()"><i class="fas fa-moon"></i></button>
+
+<div class="main-container">
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="citas"><i class="fas fa-calendar-check"></i> Citas</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="facturacion"><i class="fas fa-file-invoice-dollar"></i> Facturación</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="pacientes"><i class="fas fa-users"></i> Pacientes</button></li>
+    </ul>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="tab-content">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-check"></i>
+                    <div class="number" id="citasHoy">0</div>
+                    <div class="label">Citas Hoy</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-dollar-sign"></i>
+                    <div class="number" id="ingresosHoy">$0</div>
+                    <div class="label">Ingresos Hoy</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-week"></i>
+                    <div class="number" id="citasSemana">0</div>
+                    <div class="label">Citas Semana</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-users"></i>
+                    <div class="number" id="totalPacientes">0</div>
+                    <div class="label">Total Pacientes</div>
+                </div>
+            </div>
+        </div>
+        <div class="table-container mt-3">
+            <h5><i class="fas fa-clock"></i> Citas del Día</h5>
+            <table class="table table-hover">
+                <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th><th>Servicio</th><th>Precio</th><th>Estado</th></tr></thead>
+                <tbody id="tbodyCitasHoyAdmin"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- CITAS -->
+    <div id="citas" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-3">
+                    <input type="date" id="filtroFechaAdmin" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <select id="filtroEstadoAdmin" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="AGENDADA">Agendada</option>
+                        <option value="EN_PROGRESO">En Progreso</option>
+                        <option value="COMPLETADA">Completada</option>
+                        <option value="CANCELADA">Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select id="filtroDepartamentoAdmin" class="form-select">
+                        <option value="">Todos los departamentos</option>
+                        <option value="PSICOLOGIA">Psicología</option>
+                        <option value="PSIQUIATRIA">Psiquiatría</option>
+                        <option value="TRABAJO_SOCIAL">Trabajo Social</option>
+                        <option value="ENFERMERIA">Enfermería</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary-custom" onclick="cargarCitasAdmin()">Filtrar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th><th>Servicio</th><th>Precio</th><th>Departamento</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyCitasAdmin"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- FACTURACIÓN -->
+    <div id="facturacion" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <input type="date" id="facturaFechaInicio" class="form-control" placeholder="Fecha inicio">
+                </div>
+                <div class="col-md-4">
+                    <input type="date" id="facturaFechaFin" class="form-control" placeholder="Fecha fin">
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary-custom" onclick="cargarFacturas()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <i class="fas fa-dollar-sign"></i>
+                    <div class="number" id="facturaTotal">$0</div>
+                    <div class="label">Total Facturado</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <i class="fas fa-file-invoice"></i>
+                    <div class="number" id="facturaCantidad">0</div>
+                    <div class="label">Facturas Emitidas</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="number" id="facturaPagadas">0</div>
+                    <div class="label">Facturas Pagadas</div>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>#</th><th>Fecha</th><th>Paciente</th><th>Servicio</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyFacturas"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PACIENTES -->
+    <div id="pacientes" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <input type="text" id="buscarPacienteAdmin" class="form-control" placeholder="Buscar paciente...">
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-primary-custom" onclick="cargarPacientesAdmin()">Buscar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Total Citas</th><th>Total Gastado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyPacientesAdmin"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registrar Pago -->
+<div class="modal fade" id="pagoModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-money-bill"></i> Registrar Pago</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pagoCitaId">
+                <div class="alert alert-info">
+                    <strong>Paciente:</strong> <span id="pagoPaciente"></span><br>
+                    <strong>Servicio:</strong> <span id="pagoServicio"></span><br>
+                    <strong>Monto:</strong> $<span id="pagoMonto"></span>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Método de pago</label>
+                    <select id="pagoMetodo" class="form-select">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                        <option value="Tarjeta de Débito">Tarjeta de Débito</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Seguro Médico">Seguro Médico</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Referencia (opcional)</label>
+                    <input type="text" id="pagoReferencia" class="form-control" placeholder="Número de referencia o comprobante">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-success" onclick="registrarPago()">Registrar Pago</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/administrativo.js"></script>
+</body>
+</html>

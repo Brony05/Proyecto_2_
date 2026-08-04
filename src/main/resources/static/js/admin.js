@@ -425,13 +425,18 @@ async function crearUsuario() {
         nombreCompleto: document.getElementById('nuevoNombreCompleto').value,
         username: document.getElementById('nuevoUsername').value,
         password: document.getElementById('nuevoPassword').value,
-        rol: document.getElementById('nuevoRol').value
+        rol: document.getElementById('nuevoRol').value,
+        departamento: document.getElementById('nuevoDepartamento').value,
+        telefono: document.getElementById('nuevoTelefono')?.value || '',
+        correo: document.getElementById('nuevoCorreo')?.value || ''
     };
-    
-    if (!usuario.username || !usuario.password) {
-        mostrarMensaje('Completa los campos obligatorios', 'danger');
-        return;
-    }
+	
+	
+	
+	  if (!usuario.username || !usuario.password) {
+	      mostrarMensaje('Completa todos los campos obligatorios', 'danger');
+	      return;
+	  }
     if (usuario.password.length < 4) {
         mostrarMensaje('La contraseña debe tener al menos 4 caracteres', 'danger');
         return;
@@ -443,6 +448,13 @@ async function crearUsuario() {
             return;
         }
     }
+	if (usuario.rol === 'PSICOLOGO' || usuario.rol === 'PSIQUIATRA') {
+		        usuario.especialidad = document.getElementById('nuevoEspecialidad').value;
+		        if (!usuario.especialidad) {
+		            mostrarMensaje('Selecciona una especialidad para el profesional', 'danger');
+		            return;
+	    }
+	}
     
     setLoading(true);
     try {

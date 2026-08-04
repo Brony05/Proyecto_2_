@@ -14,12 +14,19 @@ public class Usuario {
 
     private String password;
 
-    private String rol; // ADMIN, EMPLEADO, PACIENTE, DOCTOR
+    private String rol; 
+    // ADMIN, DIRECTOR, COMITE_ETICA, JEFE_PSICOLOGIA, JEFE_PSIQUIATRIA, 
+    // JEFE_TRABAJO_SOCIAL, JEFE_ENFERMERIA, JEFE_ARCHIVO, PSICOLOGO, 
+    // PSIQUIATRA, ENFERMERO, TRABAJADOR_SOCIAL, ADMINISTRATIVO, PACIENTE
     
     private String especialidad;
     private String nombreCompleto;
     private String telefono;
     private String correo;
+
+    // Nuevo campo para el departamento al que pertenece
+    private String departamento; 
+    // PSICOLOGIA, PSIQUIATRIA, TRABAJO_SOCIAL, ENFERMERIA, ARCHIVO, ADMINISTRACION
 
     public Usuario() {}
 
@@ -29,6 +36,7 @@ public class Usuario {
         this.rol = rol;
     }
 
+    // Getters y Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getUsername() { return username; }
@@ -45,4 +53,6 @@ public class Usuario {
     public void setTelefono(String telefono) { this.telefono = telefono; }
     public String getCorreo() { return correo; }
     public void setCorreo(String correo) { this.correo = correo; }
+    public String getDepartamento() { return departamento; }
+    public void setDepartamento(String departamento) { this.departamento = departamento; }
 }

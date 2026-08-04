@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trabajador Social - Consultorio Psiquiátrico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body.light-mode {
+            background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-custom { background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); padding: 15px 20px; }
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #e65100, #bf360c);
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card i { font-size: 45px; color: #e65100; margin-bottom: 15px; }
+        .stat-card .number { font-size: 36px; font-weight: bold; }
+        .stat-card .label { color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .table-container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-x: auto; }
+        .table thead th { background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); color: white; border: none; padding: 12px; }
+        .filter-section { background: white; border-radius: 15px; padding: 15px 20px; margin-bottom: 20px; }
+        .btn-primary-custom { background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); border: none; border-radius: 10px; padding: 10px 25px; font-weight: 600; color: white; }
+        .nav-tabs .nav-link.active { background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); color: white; }
+        .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; }
+        .alert-custom { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideIn 0.3s ease; border-radius: 12px; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0%); opacity: 1; } }
+        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); color: white; border: none; cursor: pointer; z-index: 1000; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .theme-toggle:hover { transform: scale(1.1); }
+        .intervencion-card { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #e65100; }
+        .btn-sm { margin: 2px; }
+    </style>
+</head>
+<body class="light-mode">
+
+<div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+
+<nav class="navbar navbar-custom">
+    <div class="container-fluid">
+        <span class="navbar-brand text-white"><i class="fas fa-hands-helping"></i> Panel Trabajador Social</span>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-white"><i class="fas fa-user-md"></i> <span id="userName" class="fw-bold"></span></div>
+            <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-sign-out-alt"></i> Salir</button>
+        </div>
+    </div>
+</nav>
+
+<button class="theme-toggle" onclick="toggleModoOscuro()"><i class="fas fa-moon"></i></button>
+
+<div class="main-container">
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="citas"><i class="fas fa-calendar-check"></i> Citas</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="intervenciones"><i class="fas fa-file-signature"></i> Intervenciones</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="pacientes"><i class="fas fa-users"></i> Pacientes</button></li>
+    </ul>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="tab-content">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-check"></i>
+                    <div class="number" id="citasHoy">0</div>
+                    <div class="label">Citas Hoy</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-spinner"></i>
+                    <div class="number" id="citasPendientes">0</div>
+                    <div class="label">Citas Pendientes</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="number" id="intervencionesRealizadas">0</div>
+                    <div class="label">Intervenciones Realizadas</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-users"></i>
+                    <div class="number" id="totalPacientes">0</div>
+                    <div class="label">Pacientes Asignados</div>
+                </div>
+            </div>
+        </div>
+        <div class="table-container mt-3">
+            <h5><i class="fas fa-clock"></i> Próximas Citas</h5>
+            <table class="table table-hover">
+                <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyProximasCitasTS"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- CITAS -->
+    <div id="citas" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <input type="date" id="filtroFechaTS" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <select id="filtroEstadoTS" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="AGENDADA">Agendada</option>
+                        <option value="EN_PROGRESO">En Progreso</option>
+                        <option value="COMPLETADA">Completada</option>
+                        <option value="CANCELADA">Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary-custom" onclick="cargarCitasTS()">Filtrar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Doctor</th><th>Servicio</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyCitasTS"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- INTERVENCIONES -->
+    <div id="intervenciones" class="tab-content" style="display:none;">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="table-container">
+                    <h5><i class="fas fa-user"></i> Seleccionar Paciente</h5>
+                    <input type="text" id="buscarPacienteIntervencion" class="form-control mb-3" placeholder="Buscar paciente...">
+                    <div id="listaPacientesIntervencion" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="table-container">
+                    <h5><i class="fas fa-file-signature"></i> Intervenciones de Trabajo Social</h5>
+                    <div id="intervencionesContainer">
+                        <div class="alert alert-info">Selecciona un paciente para ver/agregar intervenciones</div>
+                    </div>
+                    <hr>
+                    <h5><i class="fas fa-plus-circle"></i> Registrar Intervención</h5>
+                    <input type="hidden" id="intervencionPacienteId">
+                    <div id="pacienteSeleccionadoIntervencion" class="alert alert-success mb-3" style="display:none;">
+                        <i class="fas fa-check-circle"></i> <strong>Paciente:</strong> <span id="pacienteSeleccionadoIntervencionNombre"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de intervención</label>
+                        <select id="intervencionTipo" class="form-select">
+                            <option value="">Seleccionar tipo</option>
+                            <option value="Seguimiento">Seguimiento</option>
+                            <option value="Evaluación Sociofamiliar">Evaluación Sociofamiliar</option>
+                            <option value="Apoyo Psicosocial">Apoyo Psicosocial</option>
+                            <option value="Gestión de Recursos">Gestión de Recursos</option>
+                            <option value="Orientación Familiar">Orientación Familiar</option>
+                            <option value="Vinculación Institucional">Vinculación Institucional</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea id="intervencionDescripcion" class="form-control" rows="3" placeholder="Describe la intervención realizada..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Resultado / Seguimiento</label>
+                        <textarea id="intervencionResultado" class="form-control" rows="2" placeholder="Resultados obtenidos y próximo seguimiento..."></textarea>
+                    </div>
+                    <button class="btn btn-primary-custom" onclick="guardarIntervencion()" id="btnGuardarIntervencion" disabled>
+                        <i class="fas fa-save"></i> Registrar Intervención
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PACIENTES -->
+    <div id="pacientes" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <input type="text" id="buscarPacienteTS" class="form-control" placeholder="Buscar paciente...">
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-primary-custom" onclick="cargarPacientesTS()">Buscar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Total Citas</th><th>Intervenciones</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyPacientesTS"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/trabajador-social.js"></script>
+</body>
+</html>

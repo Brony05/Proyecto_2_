@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jefe de Departamento - Consultorio Psiquiátrico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body.light-mode {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-custom { background: linear-gradient(135deg, #00695c 0%, #004d40 100%); padding: 15px 20px; }
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #00695c, #004d40);
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card i { font-size: 45px; color: #00695c; margin-bottom: 15px; }
+        .stat-card .number { font-size: 36px; font-weight: bold; }
+        .stat-card .label { color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .table-container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-x: auto; }
+        .table thead th { background: linear-gradient(135deg, #00695c 0%, #004d40 100%); color: white; border: none; padding: 12px; }
+        .filter-section { background: white; border-radius: 15px; padding: 15px 20px; margin-bottom: 20px; }
+        .btn-primary-custom { background: linear-gradient(135deg, #00695c 0%, #004d40 100%); border: none; border-radius: 10px; padding: 10px 25px; font-weight: 600; color: white; }
+        .nav-tabs .nav-link.active { background: linear-gradient(135deg, #00695c 0%, #004d40 100%); color: white; }
+        .badge-departamento { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .badge-psicologia { background: #4caf50; color: white; }
+        .badge-psiquiatria { background: #2196f3; color: white; }
+        .badge-trabajo-social { background: #ff9800; color: white; }
+        .badge-enfermeria { background: #9c27b0; color: white; }
+        .badge-archivo { background: #795548; color: white; }
+        .badge-administracion { background: #607d8b; color: white; }
+        .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; }
+        .alert-custom { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideIn 0.3s ease; border-radius: 12px; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #00695c 0%, #004d40 100%); color: white; border: none; cursor: pointer; z-index: 1000; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .theme-toggle:hover { transform: scale(1.1); }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 25px; }
+        @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+        .miembro-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="light-mode">
+
+<div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+
+<nav class="navbar navbar-custom">
+    <div class="container-fluid">
+        <span class="navbar-brand text-white"><i class="fas fa-users-cog"></i> <span id="departamentoNombre"></span></span>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-white"><i class="fas fa-user-tie"></i> <span id="userName" class="fw-bold"></span></div>
+            <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-sign-out-alt"></i> Salir</button>
+        </div>
+    </div>
+</nav>
+
+<button class="theme-toggle" onclick="toggleModoOscuro()"><i class="fas fa-moon"></i></button>
+
+<div class="main-container">
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="equipo"><i class="fas fa-users"></i> Mi Equipo</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="citas"><i class="fas fa-calendar-check"></i> Citas</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="pacientes"><i class="fas fa-user-injured"></i> Pacientes</button></li>
+    </ul>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="tab-content">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-users"></i>
+                    <div class="number" id="totalEquipo">0</div>
+                    <div class="label">Mi Equipo</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-check"></i>
+                    <div class="number" id="citasHoy">0</div>
+                    <div class="label">Citas Hoy</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-week"></i>
+                    <div class="number" id="citasSemana">0</div>
+                    <div class="label">Citas Semana</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="number" id="citasCompletadas">0</div>
+                    <div class="label">Citas Completadas</div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="table-container">
+                    <h5><i class="fas fa-clock"></i> Próximas Citas</h5>
+                    <table class="table table-hover">
+                        <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Profesional</th><th>Estado</th></tr></thead>
+                        <tbody id="tbodyProximasCitasJefe"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="table-container">
+                    <h5><i class="fas fa-users"></i> Mi Equipo</h5>
+                    <table class="table table-hover">
+                        <thead><tr><th>Nombre</th><th>Rol</th><th>Especialidad</th></tr></thead>
+                        <tbody id="tbodyEquipoResumen"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MI EQUIPO -->
+    <div id="equipo" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <button class="btn btn-primary-custom" onclick="cargarEquipo()"><i class="fas fa-sync-alt"></i> Refrescar</button>
+        </div>
+        <div class="row" id="equipoContainer"></div>
+    </div>
+
+    <!-- CITAS -->
+    <div id="citas" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <input type="date" id="filtroFechaJefe" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <select id="filtroEstadoJefe" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="AGENDADA">Agendada</option>
+                        <option value="EN_PROGRESO">En Progreso</option>
+                        <option value="COMPLETADA">Completada</option>
+                        <option value="CANCELADA">Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary-custom" onclick="cargarCitasJefe()">Filtrar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th>Profesional</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyCitasJefe"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PACIENTES -->
+    <div id="pacientes" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <input type="text" id="buscarPacienteJefe" class="form-control" placeholder="Buscar paciente...">
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-primary-custom" onclick="cargarPacientesJefe()"><i class="fas fa-search"></i> Buscar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Total Citas</th><th>Última Cita</th></tr></thead>
+                <tbody id="tbodyPacientesJefe"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/jefe.js"></script>
+</body>
+</html>

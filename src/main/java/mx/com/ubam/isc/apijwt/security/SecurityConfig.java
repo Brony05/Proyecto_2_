@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
+
 public class SecurityConfig {
 
     @Autowired
@@ -25,11 +26,19 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Rutas públicas
                 .requestMatchers("/", "/index.html", "/registro.html", "/test.html").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/favicon.ico").permitAll()
                 .requestMatchers("/auth/login", "/auth/logout", "/api/public/**").permitAll()
+                
+                // Archivos HTML (se protegerán via JavaScript)
                 .requestMatchers("/admin.html", "/empleado.html", "/paciente.html", "/dashboard.html", "/doctor.html").permitAll()
-                .requestMatchers("/api/citas/*/estado").permitAll()
+                .requestMatchers("/director.html", "/jefe.html", "/psicologo.html", "/psiquiatra.html").permitAll()
+                .requestMatchers("/administrativo.html", "/enfermero.html", "/trabajador-social.html").permitAll()
+                .requestMatchers("/director.html").permitAll()
+               
+                
+                // APIs requieren autenticación
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )

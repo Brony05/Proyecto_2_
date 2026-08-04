@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Psiquiatra - Consultorio Psiquiátrico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body.light-mode {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-custom { background: linear-gradient(135deg, #0d47a1 0%, #01579b 100%); padding: 15px 20px; }
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #0d47a1, #01579b);
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card i { font-size: 45px; color: #0d47a1; margin-bottom: 15px; }
+        .stat-card .number { font-size: 36px; font-weight: bold; }
+        .stat-card .label { color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .table-container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-x: auto; }
+        .table thead th { background: linear-gradient(135deg, #0d47a1 0%, #01579b 100%); color: white; border: none; padding: 12px; }
+        .filter-section { background: white; border-radius: 15px; padding: 15px 20px; margin-bottom: 20px; }
+        .btn-primary-custom { background: linear-gradient(135deg, #0d47a1 0%, #01579b 100%); border: none; border-radius: 10px; padding: 10px 25px; font-weight: 600; color: white; }
+        .nav-tabs .nav-link.active { background: linear-gradient(135deg, #0d47a1 0%, #01579b 100%); color: white; }
+        .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; }
+        .alert-custom { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideIn 0.3s ease; border-radius: 12px; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #0d47a1 0%, #01579b 100%); color: white; border: none; cursor: pointer; z-index: 1000; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .theme-toggle:hover { transform: scale(1.1); }
+        .nota-card { background: #f8f9fa; border-left: 4px solid #0d47a1; margin-bottom: 15px; padding: 15px; border-radius: 10px; }
+        .medicamento-card { background: #fff3e0; border-left: 4px solid #ff9800; margin-bottom: 10px; padding: 12px; border-radius: 10px; }
+        .btn-sm { margin: 2px; }
+    </style>
+</head>
+<body class="light-mode">
+
+<div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+
+<nav class="navbar navbar-custom">
+    <div class="container-fluid">
+        <span class="navbar-brand text-white"><i class="fas fa-prescription-bottle"></i> Panel Psiquiatra</span>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-white"><i class="fas fa-user-md"></i> <span id="userName" class="fw-bold"></span></div>
+            <span class="badge bg-light text-dark" id="especialidadBadge"></span>
+            <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-sign-out-alt"></i> Salir</button>
+        </div>
+    </div>
+</nav>
+
+<button class="theme-toggle" onclick="toggleModoOscuro()"><i class="fas fa-moon"></i></button>
+
+<div class="main-container">
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><button class="nav-link active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="citas"><i class="fas fa-calendar-check"></i> Mis Citas</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="pacientes"><i class="fas fa-users"></i> Mis Pacientes</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="medicamentos"><i class="fas fa-pills"></i> Medicamentos</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="notas"><i class="fas fa-notes-medical"></i> Notas Clínicas</button></li>
+    </ul>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="tab-content">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-check"></i>
+                    <div class="number" id="citasHoy">0</div>
+                    <div class="label">Citas Hoy</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-spinner"></i>
+                    <div class="number" id="citasProgreso">0</div>
+                    <div class="label">En Progreso</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="number" id="citasCompletadas">0</div>
+                    <div class="label">Completadas</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="fas fa-users"></i>
+                    <div class="number" id="totalPacientes">0</div>
+                    <div class="label">Mis Pacientes</div>
+                </div>
+            </div>
+        </div>
+        <div class="table-container mt-3">
+            <h5><i class="fas fa-clock"></i> Próximas Citas</h5>
+            <table class="table table-hover">
+                <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyProximasCitasPsiquiatra"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MIS CITAS -->
+    <div id="citas" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <input type="date" id="filtroFechaPsiquiatra" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <select id="filtroEstadoPsiquiatra" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="AGENDADA">Agendada</option>
+                        <option value="EN_PROGRESO">En Progreso</option>
+                        <option value="COMPLETADA">Completada</option>
+                        <option value="CANCELADA">Cancelada</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary-custom" onclick="cargarCitasPsiquiatra()">Filtrar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyCitasPsiquiatra"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MIS PACIENTES -->
+    <div id="pacientes" class="tab-content" style="display:none;">
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <input type="text" id="buscarPacientePsiquiatra" class="form-control" placeholder="Buscar paciente...">
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-primary-custom" onclick="cargarPacientesPsiquiatra()">Buscar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table table-hover">
+                <thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Total Citas</th><th>Última Cita</th><th>Medicamentos</th><th>Acciones</th></tr></thead>
+                <tbody id="tbodyPacientesPsiquiatra"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MEDICAMENTOS -->
+    <div id="medicamentos" class="tab-content" style="display:none;">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="table-container">
+                    <h5><i class="fas fa-user"></i> Seleccionar Paciente</h5>
+                    <input type="text" id="buscarPacienteMedicamento" class="form-control mb-3" placeholder="Buscar paciente...">
+                    <div id="listaPacientesMedicamento" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="table-container">
+                    <h5><i class="fas fa-pills"></i> Medicamentos Recetados</h5>
+                    <div id="medicamentosContainer">
+                        <div class="alert alert-info">Selecciona un paciente para ver/agregar medicamentos</div>
+                    </div>
+                    <hr>
+                    <h5><i class="fas fa-plus-circle"></i> Recetar Medicamento</h5>
+                    <input type="hidden" id="medicamentoPacienteId">
+                    <div id="pacienteSeleccionadoMedicamento" class="alert alert-success mb-3" style="display:none;">
+                        <i class="fas fa-check-circle"></i> <strong>Paciente:</strong> <span id="pacienteSeleccionadoMedicamentoNombre"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nombre del medicamento</label>
+                        <input type="text" id="medicamentoNombre" class="form-control" placeholder="Ej: Sertralina">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Dosis</label>
+                            <input type="text" id="medicamentoDosis" class="form-control" placeholder="Ej: 50mg">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Frecuencia</label>
+                            <select id="medicamentoFrecuencia" class="form-select">
+                                <option value="Diario">Diario</option>
+                                <option value="Cada 12 horas">Cada 12 horas</option>
+                                <option value="Cada 8 horas">Cada 8 horas</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Según necesidad">Según necesidad</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-2">
+                        <label class="form-label">Notas / Indicaciones</label>
+                        <textarea id="medicamentoNotas" class="form-control" rows="2" placeholder="Indicaciones adicionales..."></textarea>
+                    </div>
+                    <button class="btn btn-primary-custom" onclick="guardarMedicamento()" id="btnGuardarMedicamento" disabled>
+                        <i class="fas fa-prescription"></i> Recetar Medicamento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTAS CLÍNICAS -->
+    <div id="notas" class="tab-content" style="display:none;">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="table-container">
+                    <h5><i class="fas fa-user"></i> Seleccionar Paciente</h5>
+                    <input type="text" id="buscarPacienteNotaPsiquiatra" class="form-control mb-3" placeholder="Buscar paciente...">
+                    <div id="listaPacientesNotaPsiquiatra" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="table-container">
+                    <h5><i class="fas fa-notes-medical"></i> Notas Clínicas</h5>
+                    <div id="notasPacienteContainerPsiquiatra">
+                        <div class="alert alert-info">Selecciona un paciente para ver sus notas</div>
+                    </div>
+                    <hr>
+                    <h5><i class="fas fa-plus-circle"></i> Agregar Nota</h5>
+                    <input type="hidden" id="notaPacienteIdPsiquiatra">
+                    <div id="pacienteSeleccionadoInfoPsiquiatra" class="alert alert-success mb-3" style="display:none;">
+                        <i class="fas fa-check-circle"></i> <strong>Paciente:</strong> <span id="pacienteSeleccionadoNombrePsiquiatra"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de nota</label>
+                        <select id="notaTipoPsiquiatra" class="form-select">
+                            <option value="">Seleccionar tipo</option>
+                            <option value="DIAGNOSTICO">📋 Diagnóstico</option>
+                            <option value="RECOMENDACION">💡 Recomendación</option>
+                            <option value="CONSEJO">❤️ Consejo</option>
+                            <option value="OBSERVACION">📝 Observación</option>
+                            <option value="EVOLUCION">📊 Evolución</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contenido</label>
+                        <textarea id="notaContenidoPsiquiatra" class="form-control" rows="4" placeholder="Escribe aquí..."></textarea>
+                    </div>
+                    <button class="btn btn-primary-custom" onclick="guardarNotaPsiquiatra()" id="btnGuardarNotaPsiquiatra" disabled>
+                        <i class="fas fa-save"></i> Guardar Nota
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/psiquiatra.js"></script>
+</body>
+</html>

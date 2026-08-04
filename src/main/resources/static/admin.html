@@ -308,22 +308,41 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Rol *</label>
-                        <select id="nuevoRol" class="form-select mb-2">
-                            <option value="EMPLEADO">EMPLEADO</option>
-                            <option value="ADMIN">ADMIN</option>
-                            <option value="DOCTOR">DOCTOR</option>
-                        </select>
+						<select id="nuevoRol" class="form-select mb-2">
+						    <option value="ADMIN">ADMIN</option>
+						    <option value="DIRECTOR">DIRECTOR</option>
+						    <option value="COMITE_ETICA">COMITÉ DE ÉTICA</option>
+						    <option value="JEFE_PSICOLOGIA">JEFE DE PSICOLOGÍA</option>
+						    <option value="JEFE_PSIQUIATRIA">JEFE DE PSIQUIATRÍA</option>
+						    <option value="JEFE_TRABAJO_SOCIAL">JEFE DE TRABAJO SOCIAL</option>
+						    <option value="JEFE_ENFERMERIA">JEFE DE ENFERMERÍA</option>
+						    <option value="JEFE_ARCHIVO">JEFE DE ARCHIVO CLÍNICO</option>
+						    <option value="PSICOLOGO">PSICÓLOGO</option>
+						    <option value="PSIQUIATRA">PSIQUIATRA</option>
+						    <option value="ENFERMERO">ENFERMERO</option>
+						    <option value="TRABAJADOR_SOCIAL">TRABAJADOR SOCIAL</option>
+						    <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
+						    <option value="PACIENTE">PACIENTE</option>
+						</select>
+						
                     </div>
                     <div id="especialidadDiv" style="display:none;">
                         <label class="form-label">Especialidad *</label>
-                        <select id="nuevoEspecialidad" class="form-select">
-                            <option value="">Seleccionar especialidad</option>
-                            <option value="Psicología Clínica">Psicología Clínica</option>
-                            <option value="Psiquiatría">Psiquiatría</option>
-                            <option value="Terapia de Pareja">Terapia de Pareja</option>
-                            <option value="Psicología Infantil">Psicología Infantil</option>
-                            <option value="Neuropsicología">Neuropsicología</option>
-                        </select>
+						<div class="mb-3">
+						    <label class="form-label">Departamento</label>
+						    <select id="nuevoDepartamento" class="form-select">
+						        <option value="">Seleccionar departamento</option>
+						        <option value="PSICOLOGIA">PSICOLOGÍA</option>
+						        <option value="PSIQUIATRIA">PSIQUIATRÍA</option>
+						        <option value="TRABAJO_SOCIAL">TRABAJO SOCIAL</option>
+						        <option value="ENFERMERIA">ENFERMERÍA</option>
+						        <option value="ARCHIVO">ARCHIVO CLÍNICO</option>
+						        <option value="ADMINISTRACION">ADMINISTRACIÓN</option>
+						    </select>
+						</div>
+						
+						
+						
                     </div>
                 </div>
                 <div class="modal-footer">
