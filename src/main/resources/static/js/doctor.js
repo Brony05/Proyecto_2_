@@ -208,15 +208,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ==================== DOCTOR - FUNCIONES AUXILIARES ====================
+// Servicios del catálogo realista de hospital psiquiátrico que corresponden a cada especialidad.
+// (Ya no se usa para filtrar la agenda del doctor: /api/citas ya devuelve solo sus citas;
+//  queda como referencia de qué servicios atiende cada especialidad.)
 function obtenerServiciosPorEspecialidad(especialidad) {
     const mapa = {
-        'Psicología Clínica': ['Consulta Inicial', 'Terapia Psicológica', 'Seguimiento', 'Valoración'],
-        'Psiquiatría': ['Urgencia Psiquiátrica', 'Psiquiatría', 'Seguimiento'],
-        'Psicología Infantil': ['Psicología Infantil'],
+        'Psicología Clínica': ['Valoración Psicológica', 'Consulta Inicial', 'Terapia Psicológica Individual', 'Terapia de Seguimiento'],
+        'Psiquiatría': ['Consulta de Psiquiatría', 'Consulta de Seguimiento Psiquiátrico', 'Urgencia Psiquiátrica'],
+        'Psicología Infantil': ['Valoración Psicológica Infantil', 'Terapia Infantil y del Adolescente'],
         'Terapia de Pareja': ['Terapia de Pareja'],
-        'Neuropsicología': ['Neuropsicología', 'Valoración']
+        'Neuropsicología': ['Valoración Neuropsicológica', 'Neuropsicología Clínica']
     };
-    return mapa[especialidad] || ['Consulta Inicial'];
+    return mapa[especialidad] || [];
 }
 
 async function cambiarEstado(id, nuevoEstado) {
@@ -270,9 +273,9 @@ async function cargarDashboardDoctor() {
         if (res.ok) {
             const todasCitas = await res.json();
             const hoy = new Date().toISOString().split('T')[0];
-            const doctorEspecialidad = document.getElementById('doctorEspecialidad')?.innerText || 'Psicología Clínica';
-            const serviciosPermitidos = obtenerServiciosPorEspecialidad(doctorEspecialidad);
-            const citasFiltradas = todasCitas.filter(c => serviciosPermitidos.includes(c.servicio));
+            // /api/citas ya devuelve SOLO las citas de este doctor (personal clínico):
+            // no filtrar de nuevo por servicio/especialidad, es lo que hacía el dashboard vacío.
+            const citasFiltradas = todasCitas;
             
             const citasHoy = citasFiltradas.filter(c => c.fecha === hoy && c.estado !== 'CANCELADA').length;
             const citasProgreso = citasFiltradas.filter(c => c.estado === 'EN_PROGRESO').length;
@@ -312,10 +315,8 @@ async function cargarCitasDoctor() {
         const res = await authFetch('/api/citas');
         if (res.ok) {
             let citas = await res.json();
-            const doctorEspecialidad = document.getElementById('doctorEspecialidad')?.innerText || 'Psicología Clínica';
-            const serviciosPermitidos = obtenerServiciosPorEspecialidad(doctorEspecialidad);
-            citas = citas.filter(c => serviciosPermitidos.includes(c.servicio));
-            
+            // /api/citas ya devuelve SOLO las citas de este doctor:
+            // no volver a filtrar por servicios de la especialidad (ocultaba citas reales).
             const estadoFiltro = document.getElementById('filtroEstado')?.value;
             const fechaFiltro = document.getElementById('filtroFecha')?.value;
             if (estadoFiltro) citas = citas.filter(c => c.estado === estadoFiltro);
@@ -353,7 +354,8 @@ async function cargarCitasDoctor() {
 async function cargarPacientesDoctor() {
     setLoading(true);
     try {
-        const res = await authFetch('/api/clientes');
+        // Solo MIS pacientes asignados (por citas atendidas)
+        const res = await authFetch('/api/clientes/mis-pacientes');
         if (res.ok) {
             const pacientes = await res.json();
             const citasRes = await authFetch('/api/citas');
@@ -361,7 +363,10 @@ async function cargarPacientesDoctor() {
             
             const tbodyPacientesDoctor = document.getElementById('tbodyPacientesDoctor');
             if (tbodyPacientesDoctor) {
-                tbodyPacientesDoctor.innerHTML = pacientes.map(p => {
+                if (pacientes.length === 0) {
+                    tbodyPacientesDoctor.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Aún no tienes pacientes asignados. Aparecerán cuando atiendas citas.</td></tr>';
+                } else {
+                    tbodyPacientesDoctor.innerHTML = pacientes.map(p => {
                     const citasPaciente = todasCitas.filter(c => c.cliente?.id === p.id);
                     const ultimaCita = citasPaciente.sort((a,b) => new Date(b.fecha) - new Date(a.fecha))[0];
                     return `
@@ -376,6 +381,7 @@ async function cargarPacientesDoctor() {
                         </tr>
                     `;
                 }).join('');
+                }
             }
         }
     } catch(e) { console.error(e); }
@@ -387,11 +393,15 @@ async function buscarPaciente() {
     if (termino.length > 1) {
         setLoading(true);
         try {
-            const res = await authFetch(`/api/clientes/buscar?nombre=${termino}`);
+            // Búsqueda SOLO dentro de mis pacientes asignados
+            const res = await authFetch('/api/clientes/mis-pacientes');
             if (res.ok) {
-                const pacientes = await res.json();
+                const pacientes = (await res.json()).filter(p => (p.nombre || '').toLowerCase().includes(termino.toLowerCase()));
                 const tbodyPacientesDoctor = document.getElementById('tbodyPacientesDoctor');
                 if (tbodyPacientesDoctor) {
+                    if (pacientes.length === 0) {
+                        tbodyPacientesDoctor.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin resultados entre tus pacientes asignados.</td></tr>';
+                    } else {
                     tbodyPacientesDoctor.innerHTML = pacientes.map(p => `
                         <tr>
                             <td>${p.id}</td>
@@ -403,6 +413,7 @@ async function buscarPaciente() {
                             <td><button class="btn btn-sm btn-info" onclick="verNotasPaciente(${p.id}, '${p.nombre}')"><i class="fas fa-notes-medical"></i> Ver notas</button></td>
                         </tr>
                     `).join('');
+                    }
                 }
             }
         } catch(e) {}
@@ -416,14 +427,15 @@ async function buscarPaciente() {
 async function cargarPacientesParaNotas() {
     setLoading(true);
     try {
-        const res = await authFetch('/api/clientes');
+        // Solo MIS pacientes asignados (por citas atendidas)
+        const res = await authFetch('/api/clientes/mis-pacientes');
         if (res.ok) {
             const pacientes = await res.json();
             const listaPacientesNota = document.getElementById('listaPacientesNota');
             
             if (listaPacientesNota) {
                 if (pacientes.length === 0) {
-                    listaPacientesNota.innerHTML = '<div class="alert alert-warning text-center">No hay pacientes registrados.</div>';
+                    listaPacientesNota.innerHTML = '<div class="alert alert-warning text-center">Aún no tienes pacientes asignados. Aparecerán cuando atiendas citas.</div>';
                 } else {
                     listaPacientesNota.innerHTML = pacientes.map(p => `
                         <div class="paciente-item" 
@@ -682,15 +694,18 @@ async function cargarCalendario() {
     
     const res = await authFetch('/api/citas');
     const citas = await res.json();
-    const doctorEspecialidad = document.getElementById('doctorEspecialidad')?.innerText || 'Psicología Clínica';
-    const serviciosPermitidos = obtenerServiciosPorEspecialidad(doctorEspecialidad);
-    const citasFiltradas = citas.filter(c => serviciosPermitidos.includes(c.servicio));
-    
+    // /api/citas ya devuelve SOLO las citas de este doctor: se muestra TODA su agenda en el calendario.
+    // Filtro opcional por estado desde la leyenda + colores por estado.
+    const filtroEstado = document.getElementById('filtroCalendarioEstado')?.value || '';
+    const citasFiltradas = filtroEstado ? citas.filter(c => c.estado === filtroEstado) : citas;
+    const COLORES_ESTADO = { AGENDADA: '#0d6efd', REAGENDADA: '#6f42c1', EN_PROGRESO: '#ffc107', COMPLETADA: '#198754', CANCELADA: '#b6b6b6' };
     const events = citasFiltradas.map(c => ({
         id: c.id,
         title: `${c.cliente?.nombre || 'Paciente'} - ${c.servicio || 'Cita'}`,
         start: `${c.fecha}T${c.hora}`,
-        backgroundColor: c.estado === 'COMPLETADA' ? '#28a745' : c.estado === 'EN_PROGRESO' ? '#ffc107' : '#007bff',
+        backgroundColor: COLORES_ESTADO[c.estado] || '#6c757d',
+        textColor: (c.estado === 'EN_PROGRESO' || c.estado === 'CANCELADA') ? '#212529' : '#fff',
+        borderColor: c.estado === 'CANCELADA' ? '#999' : undefined,
         extendedProps: {
             estado: c.estado,
             cliente: c.cliente?.nombre,

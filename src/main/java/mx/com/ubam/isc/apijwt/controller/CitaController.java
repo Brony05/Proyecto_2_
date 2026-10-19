@@ -5,13 +5,13 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import mx.com.ubam.isc.apijwt.model.Cita;
-import mx.com.ubam.isc.apijwt.model.Usuario;
+import mx.com.ubam.isc.apijwt.model.Cita;import mx.com.ubam.isc.apijwt.model.Usuario;
 import mx.com.ubam.isc.apijwt.model.Cliente;
 import mx.com.ubam.isc.apijwt.model.Servicio;
 import mx.com.ubam.isc.apijwt.service.CitaService;
 import mx.com.ubam.isc.apijwt.service.EmailService;
 import mx.com.ubam.isc.apijwt.service.PdfExportService;
+import mx.com.ubam.isc.apijwt.service.AuditoriaService;
 import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.repository.ClienteRepository;
 import mx.com.ubam.isc.apijwt.repository.ServicioRepository;
@@ -19,9 +19,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -42,14 +46,25 @@ public class CitaController {
     
     @Autowired
     private ClienteRepository clienteRepository;
+
+    @Autowired
+    private mx.com.ubam.isc.apijwt.repository.CitaRepository citaRepository;
     
     @Autowired
     private ServicioRepository servicioRepository;
+
+    @Autowired
+    private AuditoriaService auditoriaService;
 
     private static final List<String> HORARIOS_DISPONIBLES = List.of(
         "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
         "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
         "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00"
+    );
+
+    // Roles del personal clínico que atienden citas y pueden iniciarlas/completarlas
+    private static final List<String> ROLES_CLINICOS = List.of(
+        "DOCTOR", "PSICOLOGO", "PSIQUIATRA", "ENFERMERO", "TRABAJADOR_SOCIAL"
     );
 
     @GetMapping
@@ -74,6 +89,11 @@ public class CitaController {
                 return ResponseEntity.ok(List.of());
             }
             
+            // Asignación de pacientes: el personal clínico SOLO ve sus propias citas
+            if (ROLES_CLINICOS.contains(usuario.getRol())) {
+                return ResponseEntity.ok(citaRepository.findByDoctorId(usuario.getId()));
+            }
+            
             return ResponseEntity.ok(citaService.listarTodas());
             
         } catch (Exception e) {
@@ -93,26 +113,77 @@ public class CitaController {
         return ResponseEntity.ok(servicioRepository.findByActivoTrueOrderByNombreAsc());
     }
 
-    private Usuario asignarDoctorPorEspecialidad(String servicioNombre) {
+    private Usuario asignarDoctorPorEspecialidad(String servicioNombre, LocalDate fecha, LocalTime hora) {
         String especialidadRequerida;
         switch (servicioNombre) {
-            case "Consulta Inicial": especialidadRequerida = "Psicología Clínica"; break;
-            case "Terapia Psicológica": especialidadRequerida = "Psicología Clínica"; break;
-            case "Seguimiento": especialidadRequerida = "Psicología Clínica"; break;
-            case "Urgencia Psiquiátrica": especialidadRequerida = "Psiquiatría"; break;
-            case "Valoración": especialidadRequerida = "Neuropsicología"; break;
-            case "Terapia de Pareja": especialidadRequerida = "Terapia de Pareja"; break;
-            case "Psicología Infantil": especialidadRequerida = "Psicología Infantil"; break;
-            case "Neuropsicología": especialidadRequerida = "Neuropsicología"; break;
-            case "Psiquiatría": especialidadRequerida = "Psiquiatría"; break;
+            // Psicología Clínica
+            case "Consulta Inicial":
+            case "Valoración Psicológica":
+            case "Terapia Psicológica Individual":
+            case "Terapia de Seguimiento":
+                especialidadRequerida = "Psicología Clínica"; break;
+            // Psiquiatría
+            case "Valoración Psiquiátrica":
+            case "Consulta de Seguimiento Psiquiátrico":
+            case "Urgencia Psiquiátrica":
+                especialidadRequerida = "Psiquiatría"; break;
+            // Infantil
+            case "Terapia Infantil y del Adolescente":
+                especialidadRequerida = "Psicología Infantil"; break;
+            // Pareja / Familia
+            case "Terapia de Pareja":
+            case "Terapia Familiar":
+                especialidadRequerida = "Terapia de Pareja"; break;
+            // Neuropsicología
+            case "Valoración Neuropsicológica":
+                especialidadRequerida = "Neuropsicología"; break;
             default: especialidadRequerida = "Psicología Clínica";
         }
         
-        List<Usuario> doctores = usuarioRepository.findByRolAndEspecialidad("DOCTOR", especialidadRequerida);
-        if (doctores.isEmpty()) {
+        // 1) Compatibilidad con el modelo anterior: usuarios con rol DOCTOR
+        List<Usuario> candidatos = new ArrayList<>(usuarioRepository.findByRolAndEspecialidad("DOCTOR", especialidadRequerida));
+        
+        // 2) Modelo nuevo por rol/departamento (PSICOLOGO, PSIQUIATRA, etc.)
+        if (candidatos.isEmpty()) {
+            candidatos = new ArrayList<>(candidatosPorRol(especialidadRequerida));
+        }
+        if (candidatos.isEmpty()) {
             return null;
         }
-        return doctores.get(0);
+        
+        // Preferir a quienes tienen la especialidad exacta; si nadie la tiene, todo el pool del rol
+        List<Usuario> conEspecialidad = candidatos.stream()
+                .filter(u -> especialidadRequerida.equals(u.getEspecialidad()))
+                .collect(Collectors.toList());
+        List<Usuario> pool = conEspecialidad.isEmpty() ? candidatos : conEspecialidad;
+        
+        // Elegir al primer especialista libre en el horario solicitado
+        for (Usuario candidato : pool) {
+            if (citaService.verificarDisponibilidadDoctor(candidato.getId(), fecha, hora)) {
+                return candidato;
+            }
+        }
+        
+        // Ninguno libre: devolver el primero para que el flujo normal muestre el error de horario
+        return pool.get(0);
+    }
+    
+    private List<Usuario> candidatosPorRol(String especialidad) {
+        if (especialidad == null) {
+            return List.of();
+        }
+        if (especialidad.contains("Psiquiat")) {
+            return usuarioRepository.findByRol("PSIQUIATRA");
+        }
+        if (especialidad.contains("Neuropsic")) {
+            List<Usuario> pool = new ArrayList<>(usuarioRepository.findByRol("PSICOLOGO"));
+            pool.addAll(usuarioRepository.findByRol("PSIQUIATRA"));
+            return pool;
+        }
+        if (especialidad.contains("Psicolog") || especialidad.contains("Terapia")) {
+            return usuarioRepository.findByRol("PSICOLOGO");
+        }
+        return List.of();
     }
     
     private String getNombreDoctor(Usuario doctor) {
@@ -191,7 +262,7 @@ public class CitaController {
                 }
             }
             
-            Usuario doctor = asignarDoctorPorEspecialidad(servicioNombre);
+            Usuario doctor = asignarDoctorPorEspecialidad(servicioNombre, fecha, hora);
             if (doctor == null) {
                 return ResponseEntity.badRequest().body("No hay doctores disponibles para el servicio: " + servicioNombre);
             }
@@ -208,9 +279,7 @@ public class CitaController {
                 return ResponseEntity.badRequest().body("Ya has agendado una Consulta Inicial anteriormente.");
             }
             
-            if (!citaService.verificarDisponibilidad(fecha, hora)) {
-                return ResponseEntity.badRequest().body("El horario " + hora + " ya está ocupado.");
-            }
+            // La disponibilidad ya se validó por doctor arriba; se eliminó la validación global deprecada
             
             Cita cita = new Cita();
             cita.setFecha(fecha);
@@ -231,6 +300,10 @@ public class CitaController {
             }
             
             Cita nueva = citaService.crear(cita);
+            
+            auditoriaService.registrar(usuario.getUsername(), "CREACION",
+                "Cita agendada ID " + nueva.getId() + " - " + servicioNombre + " el " + fecha
+                + " " + hora + " para '" + cliente.getNombre() + "'");
             
             if (nueva.getCliente() != null && nueva.getCliente().getCorreo() != null) {
                 try {
@@ -296,6 +369,11 @@ public class CitaController {
                 }
             }
             
+            // Validar que el especialista asignado esté libre en el nuevo horario
+            if (cita.getDoctor() != null && !citaService.verificarDisponibilidadDoctor(cita.getDoctor().getId(), nuevaFecha, nuevaHora)) {
+                return ResponseEntity.badRequest().body("El especialista no está disponible en ese horario. Elige otra hora.");
+            }
+            
             String motivoFinal = (motivo != null && !motivo.isEmpty()) ? motivo : "Cambio de horario solicitado por el paciente";
             Cita citaReagendada = citaService.reagendar(id, nuevaFecha, nuevaHora, motivoFinal);
             
@@ -341,10 +419,12 @@ public class CitaController {
                 return ResponseEntity.status(401).body("Usuario no autenticado");
             }
             
-            // DOCTOR también puede cambiar estado
+            // Personal clínico (DOCTOR, PSICOLOGO, PSIQUIATRA, ENFERMERO, TRABAJADOR_SOCIAL)
+            // también puede cambiar el estado de sus propias citas
+            boolean esClinico = ROLES_CLINICOS.contains(usuario.getRol());
             if (!"ADMIN".equals(usuario.getRol()) && 
                 !"EMPLEADO".equals(usuario.getRol()) && 
-                !"DOCTOR".equals(usuario.getRol())) {
+                !esClinico) {
                 return ResponseEntity.status(403).body("No tienes permiso para cambiar el estado de las citas");
             }
             
@@ -354,10 +434,10 @@ public class CitaController {
                 return ResponseEntity.notFound().build();
             }
             
-            // Si es DOCTOR, verificar que la cita le pertenece
-            if ("DOCTOR".equals(usuario.getRol())) {
+            // Si es personal clínico, verificar que la cita le pertenece
+            if (esClinico) {
                 if (cita.getDoctor() == null || !cita.getDoctor().getId().equals(usuario.getId())) {
-                    return ResponseEntity.status(403).body("No puedes cambiar el estado de citas de otro doctor");
+                    return ResponseEntity.status(403).body("No puedes cambiar el estado de citas asignadas a otro especialista");
                 }
             }
             
@@ -365,6 +445,11 @@ public class CitaController {
             System.out.println("👤 Usuario: " + usuario.getUsername() + " - Rol: " + usuario.getRol());
             
             Cita citaActualizada = citaService.actualizarEstado(id, estado);
+            
+            auditoriaService.registrar(usuario.getUsername(),
+                "CANCELADA".equals(estado) ? "CANCELACION" : "MODIFICACION",
+                "Cita ID " + id + " (" + cita.getServicio() + " del " + cita.getFecha()
+                + ") cambia de " + cita.getEstado() + " a " + estado);
             
             return ResponseEntity.ok(citaActualizada);
             
@@ -397,6 +482,13 @@ public class CitaController {
             }
             
             Cita citaCancelada = citaService.cancelar(id);
+            
+            if (usuario != null) {
+                auditoriaService.registrar(usuario.getUsername(), "CANCELACION",
+                    "Cancelación de cita ID " + id + " (" + cita.getServicio() + " del "
+                    + cita.getFecha() + ") del paciente '"
+                    + (cita.getCliente() != null ? cita.getCliente().getNombre() : "N/A") + "'");
+            }
             
             if (citaCancelada.getCliente() != null && citaCancelada.getCliente().getCorreo() != null) {
                 try {
@@ -467,14 +559,46 @@ public class CitaController {
         }
     }
 
+    // ============================================================
+    // HORARIOS DISPONIBLES: ahora por servicio (agenda del especialista que lo atendería)
+    // ============================================================
     @GetMapping("/horarios-disponibles")
     public ResponseEntity<?> getHorariosDisponibles(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) String servicio) {
         
-        List<String> horariosOcupados = citaService.getHorariosOcupados(fecha);
+        List<String> horariosOcupadosFinal;
+        
+        if (servicio != null && !servicio.isEmpty()) {
+            // Disponibilidad real: agenda del especialista que atendería ese servicio
+            Set<String> ocupadosSet = new java.util.HashSet<>();
+            for (String h : HORARIOS_DISPONIBLES) {
+                LocalTime hora = LocalTime.parse(h);
+                Usuario doctor = asignarDoctorPorEspecialidad(servicio, fecha, hora);
+                if (doctor == null || !citaService.verificarDisponibilidadDoctor(doctor.getId(), fecha, hora)) {
+                    ocupadosSet.add(h);
+                }
+            }
+            horariosOcupadosFinal = new ArrayList<>(ocupadosSet);
+        } else {
+            // Compatibilidad sin servicio: usa el pool de especialistas
+            horariosOcupadosFinal = citaService.getHorariosOcupados(fecha);
+        }
+        final List<String> horariosOcupados = horariosOcupadosFinal;
+        
         List<String> horariosDisponibles = HORARIOS_DISPONIBLES.stream()
                 .filter(h -> !horariosOcupados.contains(h))
                 .toList();
+        
+        // No mostrar horarios que ya pasaron el día de hoy
+        LocalDate hoy = LocalDate.now();
+        LocalTime ahora = LocalTime.now();
+        if (fecha.equals(hoy)) {
+            final LocalTime ahoraFinal = ahora;
+            horariosDisponibles = horariosDisponibles.stream()
+                    .filter(h -> LocalTime.parse(h).isAfter(ahoraFinal))
+                    .toList();
+        }
         
         Map<String, Object> response = new HashMap<>();
         response.put("fecha", fecha);
@@ -488,7 +612,10 @@ public class CitaController {
     public ResponseEntity<Boolean> verificarDisponibilidad(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime hora) {
-        return ResponseEntity.ok(citaService.verificarDisponibilidad(fecha, hora));
+        // Ahora es por doctor: si hay ALGÚN especialista libre a esa hora, hay disponibilidad
+        boolean disponible = HORARIOS_DISPONIBLES.contains(hora.format(DateTimeFormatter.ofPattern("HH:mm")))
+                && citaService.getEspecialesLibres(fecha, hora) > 0;
+        return ResponseEntity.ok(disponible);
     }
 
     @GetMapping("/por-fecha")

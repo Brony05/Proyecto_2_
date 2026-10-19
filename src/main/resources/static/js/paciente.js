@@ -51,10 +51,13 @@ async function cargarMensajesNoLeidos() {
 }
 
 // ==================== PACIENTE - SERVICIOS ====================
+let agendando = false; // Evita doble click / doble envío al agendar
+
 async function cargarServicios() {
     try {
         const citasRes = await authFetch('/api/citas');
         const citas = await citasRes.json();
+        // Consulta Inicial activa O completada => ya no se puede volver a agendar
         const tuvoConsultaInicial = citas.some(c => c.servicio === 'Consulta Inicial' && c.estado !== 'CANCELADA');
         
         const res = await authFetch('/api/servicios');
@@ -72,7 +75,7 @@ async function cargarServicios() {
             
             if (tuvoConsultaInicial) {
                 document.getElementById('serviciosContainer').insertAdjacentHTML('afterbegin', 
-                    `<div class="alert alert-info mb-3"><i class="fas fa-info-circle"></i> Ya has completado tu Consulta Inicial. Ahora puedes agendar citas de seguimiento.</div>`);
+                    `<div class="alert alert-info mb-3"><i class="fas fa-info-circle"></i> Ya tienes tu Consulta Inicial. Ahora puedes agendar citas de seguimiento con tu especialista.</div>`);
             }
             
             document.querySelectorAll('.servicio-card').forEach(card => {
@@ -82,7 +85,7 @@ async function cargarServicios() {
                     servicioActual = this.getAttribute('data-servicio');
                     precioActual = parseFloat(this.getAttribute('data-precio'));
                     document.getElementById('precioMostrado').innerHTML = formatearPrecio(precioActual);
-                    document.getElementById('acompananteSection').style.display = servicioActual === 'Terapia de Pareja' ? 'block' : 'none';
+                    document.getElementById('acompananteSection').style.display = (servicioActual === 'Terapia de Pareja' || servicioActual === 'Terapia Familiar') ? 'block' : 'none';
                     verificarFormularioCompleto();
                 });
             });
@@ -97,7 +100,9 @@ document.getElementById('citaFecha')?.addEventListener('change', async function(
     fechaActual = fecha;
     setLoading(true);
     try {
-        const response = await authFetch(`/api/citas/horarios-disponibles?fecha=${fecha}`);
+        // Pregunta la agenda del especialista que atendería el servicio elegido
+        const servicioQ = servicioActual ? `&servicio=${encodeURIComponent(servicioActual)}` : '';
+        const response = await authFetch(`/api/citas/horarios-disponibles?fecha=${fecha}${servicioQ}`);
         if (response.ok) {
             const data = await response.json();
             let horarios = data.horariosDisponibles || [];
@@ -180,6 +185,13 @@ async function confirmarCita() {
         mostrarMensaje('Selecciona servicio, fecha y hora', 'danger');
         return;
     }
+    // Evita el doble click mientras la petición está en curso
+    if (agendando) return;
+    agendando = true;
+    const btnConfirmar = document.getElementById('btnConfirmar');
+    const textoOriginal = btnConfirmar.innerHTML;
+    btnConfirmar.disabled = true;
+    btnConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Agendando...';
     setLoading(true);
     const cita = { fecha: fechaActual, hora: horaActual, servicio: servicioActual, estado: 'AGENDADA' };
     if (servicioActual === 'Terapia de Pareja') {
@@ -201,6 +213,9 @@ async function confirmarCita() {
     } catch (error) {
         mostrarMensaje('Error al agendar', 'danger');
     }
+    agendando = false;
+    btnConfirmar.disabled = false;
+    btnConfirmar.innerHTML = textoOriginal;
     setLoading(false);
 }
 
@@ -296,7 +311,8 @@ async function reagendarCita(id, fechaActual, horaActual, servicioActual, precio
         if (!nuevaFecha) return;
         setLoading(true);
         try {
-            const response = await authFetch(`/api/citas/horarios-disponibles?fecha=${nuevaFecha}`);
+            const servicioQ = servicioActual ? `&servicio=${encodeURIComponent(servicioActual)}` : '';
+            const response = await authFetch(`/api/citas/horarios-disponibles?fecha=${nuevaFecha}${servicioQ}`);
             if (response.ok) {
                 let horarios = (await response.json()).horariosDisponibles || [];
                 const ahora = new Date();
@@ -350,6 +366,12 @@ async function confirmarReagendar() {
         return;
     }
     
+    // Evita doble click mientras la petición está en curso
+    const btnRe = document.querySelector('#reagendarModal .btn-primary:last-of-type') ||
+                  document.querySelector('#reagendarModal button.btn-primary');
+    if (confirmarReagendar.enviando) return;
+    confirmarReagendar.enviando = true;
+    if (btnRe) { btnRe.disabled = true; btnRe.dataset.txt = btnRe.innerHTML; btnRe.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Reagendando...'; }
     setLoading(true);
     try {
         const url = `/api/citas/${id}/reagendar?nuevaFecha=${nuevaFecha}&nuevaHora=${horaReagendarSeleccionada}&motivo=${encodeURIComponent(motivo)}`;
@@ -365,6 +387,8 @@ async function confirmarReagendar() {
     } catch (error) {
         document.getElementById('reagendarMensaje').innerHTML = '<div class="alert alert-danger">Error al reagendar</div>';
     }
+    confirmarReagendar.enviando = false;
+    if (btnRe) { btnRe.disabled = false; btnRe.innerHTML = btnRe.dataset.txt || 'Confirmar Reagendar'; }
     setLoading(false);
 }
 
@@ -377,19 +401,19 @@ async function cargarHistoriaClinica() {
             const data = await res.json();
             
             document.getElementById('diagnosticosContainer').innerHTML = data.diagnosticos?.length > 0 ?
-                data.diagnosticos.map(d => `<div class="nota-card"><strong>${d.doctor?.username || 'Doctor'}</strong> - ${new Date(d.fechaCreacion).toLocaleDateString()}<p class="mt-2">${d.diagnostico}</p></div>`).join('') :
+                data.diagnosticos.map(d => `<div class="nota-card"><strong>${d.doctor?.nombreCompleto || d.doctor?.username || 'Doctor'}</strong> - ${new Date(d.fechaCreacion).toLocaleDateString()}<p class="mt-2">${d.diagnostico}</p></div>`).join('') :
                 '<p class="text-muted">No hay diagnósticos registrados.</p>';
             
             document.getElementById('recomendacionesContainer').innerHTML = data.recomendaciones?.length > 0 ?
-                data.recomendaciones.map(r => `<div class="nota-card"><strong>${r.doctor?.username || 'Doctor'}</strong> - ${new Date(r.fechaCreacion).toLocaleDateString()}<p class="mt-2">${r.recomendaciones}</p></div>`).join('') :
+                data.recomendaciones.map(r => `<div class="nota-card"><strong>${r.doctor?.nombreCompleto || r.doctor?.username || 'Doctor'}</strong> - ${new Date(r.fechaCreacion).toLocaleDateString()}<p class="mt-2">${r.recomendaciones}</p></div>`).join('') :
                 '<p class="text-muted">No hay recomendaciones registradas.</p>';
             
             document.getElementById('medicamentosContainer').innerHTML = data.medicamentos?.length > 0 ?
-                data.medicamentos.map(m => `<div class="nota-card"><strong>${m.doctor?.username || 'Doctor'}</strong> - ${new Date(m.fechaCreacion).toLocaleDateString()}<p class="mt-2">${m.medicamentos}</p></div>`).join('') :
+                data.medicamentos.map(m => `<div class="nota-card"><strong>${m.doctor?.nombreCompleto || m.doctor?.username || 'Doctor'}</strong> - ${new Date(m.fechaCreacion).toLocaleDateString()}<p class="mt-2">${m.medicamentos}</p></div>`).join('') :
                 '<p class="text-muted">No hay medicamentos recetados.</p>';
             
             document.getElementById('consejosContainer').innerHTML = data.consejos?.length > 0 ?
-                data.consejos.map(c => `<div class="nota-card"><strong>${c.doctor?.username || 'Doctor'}</strong> - ${new Date(c.fechaCreacion).toLocaleDateString()}<p class="mt-2">${c.recomendaciones || c.diagnostico}</p></div>`).join('') :
+                data.consejos.map(c => `<div class="nota-card"><strong>${c.doctor?.nombreCompleto || c.doctor?.username || 'Doctor'}</strong> - ${new Date(c.fechaCreacion).toLocaleDateString()}<p class="mt-2">${c.recomendaciones || c.diagnostico}</p></div>`).join('') :
                 '<p class="text-muted">No hay consejos registrados.</p>';
         }
     } catch(e) { console.error(e); }

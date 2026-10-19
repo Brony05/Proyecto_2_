@@ -10,6 +10,7 @@ import mx.com.ubam.isc.apijwt.model.TokenInvalido;
 import mx.com.ubam.isc.apijwt.repository.TokenInvalidoRepository;
 import mx.com.ubam.isc.apijwt.security.JwtUtil;
 import mx.com.ubam.isc.apijwt.service.UsuarioService;
+import mx.com.ubam.isc.apijwt.service.AuditoriaService;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +27,9 @@ public class AuthController {
     
     @Autowired
     private TokenInvalidoRepository tokenInvalidoRepository;
+
+    @Autowired
+    private AuditoriaService auditoriaService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
@@ -48,12 +52,17 @@ public class AuthController {
             response.put("rol", rol);
             response.put("especialidad", user.getEspecialidad());
             
+            auditoriaService.registrar(user.getUsername(), "LOGIN",
+                "Inicio de sesión exitoso (rol " + rol + ")");
+            
             System.out.println("Token generado para: " + user.getUsername() + " con rol: " + rol);
             return ResponseEntity.ok(response);
         }
         
         Map<String, String> error = new HashMap<>();
         error.put("error", "Credenciales inválidas");
+        auditoriaService.registrar(request.getUsername(), "LOGIN_FALLIDO",
+            "Intento de inicio de sesión con credenciales incorrectas");
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
     

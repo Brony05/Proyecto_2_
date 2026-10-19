@@ -8,7 +8,10 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class JwtUtil {
-    private final String SECRET = "mi_clave_secreta_super_segura_12345678901234567890";
+    // El secreto se lee de variable de entorno JWT_SECRET; el fallback mantiene los tokens existentes válidos
+    private final String SECRET = System.getenv("JWT_SECRET") != null 
+            ? System.getenv("JWT_SECRET") 
+            : "mi_clave_secreta_super_segura_12345678901234567890";
     
     private Key getKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());

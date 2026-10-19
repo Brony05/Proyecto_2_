@@ -13,9 +13,17 @@ import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.repository.ClienteRepository;
 import mx.com.ubam.isc.apijwt.repository.CitaRepository;
 import mx.com.ubam.isc.apijwt.repository.TokenInvalidoRepository;
+import mx.com.ubam.isc.apijwt.service.AuditoriaService;
 import jakarta.transaction.Transactional;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
+
+/**
+ * Gestión de usuarios del consultorio.
+ * ADMIN y DIRECTOR pueden crear/eliminar personal; el DIRECTOR no puede manipular cuentas ADMIN.
+ */
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -36,6 +44,20 @@ public class UsuarioController {
     
     @Autowired
     private TokenInvalidoRepository tokenInvalidoRepository;
+
+    @Autowired
+    private AuditoriaService auditoriaService;
+
+    // Whitelist completa de roles del organigrama del consultorio
+    private static final List<String> ROLES_VALIDOS = List.of(
+        "ADMIN", "DIRECTOR", "COMITE_ETICA",
+        "JEFE_PSICOLOGIA", "JEFE_PSIQUIATRIA", "JEFE_TRABAJO_SOCIAL", "JEFE_ENFERMERIA", "JEFE_ARCHIVO",
+        "PSICOLOGO", "PSIQUIATRA", "ENFERMERO", "TRABAJADOR_SOCIAL",
+        "ADMINISTRATIVO", "EMPLEADO", "PACIENTE"
+    );
+
+    // Roles clínicos que requieren especialidad obligatoria
+    private static final List<String> ROLES_CON_ESPECIALIDAD = List.of("PSICOLOGO", "PSIQUIATRA", "DOCTOR");
 
     @GetMapping
     public ResponseEntity<?> listar() {
@@ -65,7 +87,7 @@ public class UsuarioController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('DIRECTOR')")
     public ResponseEntity<?> crearUsuario(@RequestBody Usuario usuario) {
         try {
             System.out.println("🔵 Creando nuevo usuario: " + usuario.getUsername());
@@ -82,20 +104,23 @@ public class UsuarioController {
                 return ResponseEntity.badRequest().body("La contraseña debe tener al menos 4 caracteres");
             }
             
-            if (usuario.getRol() == null || (!usuario.getRol().equals("ADMIN") && 
-                !usuario.getRol().equals("EMPLEADO") && !usuario.getRol().equals("DOCTOR"))) {
-                return ResponseEntity.badRequest().body("El rol debe ser ADMIN, EMPLEADO o DOCTOR");
+            String rolSolicitado = usuario.getRol() != null ? usuario.getRol().toUpperCase() : null;
+            if (rolSolicitado == null || !ROLES_VALIDOS.contains(rolSolicitado)) {
+                return ResponseEntity.badRequest().body("Rol no válido. Roles permitidos: " + String.join(", ", ROLES_VALIDOS));
             }
+            usuario.setRol(rolSolicitado);
             
-            if ("DOCTOR".equals(usuario.getRol()) && 
+            if (ROLES_CON_ESPECIALIDAD.contains(rolSolicitado) && 
                 (usuario.getEspecialidad() == null || usuario.getEspecialidad().isEmpty())) {
-                return ResponseEntity.badRequest().body("Para un DOCTOR la especialidad es obligatoria");
+                return ResponseEntity.badRequest().body("Para un " + rolSolicitado + " la especialidad es obligatoria");
             }
             
             usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
             Usuario nuevo = usuarioRepository.save(usuario);
             
             System.out.println("✅ Usuario creado: " + nuevo.getUsername() + " - Rol: " + nuevo.getRol());
+            auditoriaService.registrar(AuditoriaService.usuarioActual(), "USUARIO",
+                "Creación de usuario '" + nuevo.getUsername() + "' con rol " + nuevo.getRol());
             
             return ResponseEntity.ok(nuevo);
             
@@ -106,6 +131,7 @@ public class UsuarioController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('DIRECTOR')")
     @Transactional
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
         try {
@@ -117,6 +143,15 @@ public class UsuarioController {
             Usuario usuario = usuarioOpt.get();
             String username = usuario.getUsername();
             String rol = usuario.getRol();
+            
+            // El DIRECTOR no puede eliminar cuentas ADMIN ni a sí mismo
+            String usuarioActual = AuditoriaService.usuarioActual();
+            if ("ADMIN".equals(rol) && !usuarioActual.equals(username)) {
+                return ResponseEntity.status(403).body("Solo el ADMIN puede eliminar otras cuentas ADMIN");
+            }
+            if (username.equals(usuarioActual)) {
+                return ResponseEntity.badRequest().body("No puedes eliminar tu propia cuenta mientras tienes sesión activa");
+            }
             
             System.out.println("🔵 Eliminando usuario: " + username + " (Rol: " + rol + ")");
             
@@ -137,6 +172,8 @@ public class UsuarioController {
             
             usuarioRepository.deleteById(id);
             System.out.println("✅ Usuario eliminado: " + username);
+            auditoriaService.registrar(usuarioActual, "USUARIO",
+                "Eliminación de usuario '" + username + "' (rol " + rol + ")");
             
             return ResponseEntity.ok("Usuario '" + username + "' eliminado correctamente");
             

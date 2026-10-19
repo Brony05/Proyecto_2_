@@ -98,4 +98,38 @@ public class ClienteController {
     public List<Cliente> buscar(@RequestParam String nombre) {
         return clienteService.buscarPorNombre(nombre);
     }
+
+    /**
+     * Pacientes asignados al usuario autenticado:
+     *  - Personal clínico: SOLO los pacientes con citas atendidas por él/ella
+     *  - ADMIN/EMPLEADO/otros: todos los pacientes
+     */
+    @GetMapping("/mis-pacientes")
+    public ResponseEntity<?> misPacientes() {
+        try {
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            Usuario usuario = usuarioRepository.findByUsername(username).orElse(null);
+            if (usuario == null) {
+                return ResponseEntity.status(401).body("Usuario no autenticado");
+            }
+
+            List<String> rolesClinicos = List.of("DOCTOR", "PSICOLOGO", "PSIQUIATRA", "ENFERMERO", "TRABAJADOR_SOCIAL");
+            if (usuario.getRol() != null && rolesClinicos.contains(usuario.getRol())) {
+                List<Cliente> propios = citaRepository.findByDoctorId(usuario.getId()).stream()
+                        .map(Cita::getCliente)
+                        .filter(c -> c != null)
+                        .collect(java.util.stream.Collectors.toMap(Cliente::getId, c -> c, (a, b) -> a))
+                        .values().stream()
+                        .sorted(java.util.Comparator.comparing(Cliente::getNombre,
+                                java.util.Comparator.nullsLast(String::compareToIgnoreCase)))
+                        .toList();
+                return ResponseEntity.ok(propios);
+            }
+
+            return ResponseEntity.ok(clienteService.listarTodos());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
 }

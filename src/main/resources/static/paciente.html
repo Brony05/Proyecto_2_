@@ -333,7 +333,7 @@
 	    <div class="chatbot-header">
 	        <div>
 	            <i class="fas fa-brain"></i>
-	            <strong> Asistente IA de Salud Mental</strong>
+	            <strong> Tu Asistente de Bienestar</strong>
 	        </div>
 	        <button onclick="toggleChatbot()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">&times;</button>
 	    </div>
@@ -341,7 +341,7 @@
 	    <div class="chatbot-messages" id="chatbotMessages">
 	        <div class="message bot">
 	            <div class="bubble">
-	                <i class="fas fa-robot"></i> ¡Hola! Soy tu asistente de salud mental. Puedo ayudarte a entender tu diagnóstico, darte consejos de bienestar y responder tus dudas. ¿En qué puedo ayudarte hoy?
+	                <i class="fas fa-robot"></i> ¡Hola! Soy tu asistente personal de bienestar. Puedo explicarte tu diagnóstico con palabras sencillas, darte consejos para sentirte mejor y resolver tus dudas. ¿En qué te ayudo hoy?
 	            </div>
 	        </div>
 	    </div>
@@ -369,11 +369,19 @@
 	    document.getElementById('chatbotWindow').style.display = chatbotAbierto ? 'flex' : 'none';
 	}
 
+	function formatearTextoBot(texto) {
+	    const seguro = String(texto ?? '')
+	        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	    return seguro
+	        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+	        .replace(/\n/g, '<br>');
+	}
+
 	function agregarMensaje(texto, tipo) {
 	    const container = document.getElementById('chatbotMessages');
 	    const div = document.createElement('div');
 	    div.className = `message ${tipo}`;
-	    div.innerHTML = `<div class="bubble">${texto}</div>`;
+	    div.innerHTML = `<div class="bubble">${formatearTextoBot(texto)}</div>`;
 	    container.appendChild(div);
 	    container.scrollTop = container.scrollHeight;
 	}
@@ -420,18 +428,12 @@
 	            if (notasRes.ok) {
 	                const notas = await notasRes.json();
 	                if (notas.diagnosticos && notas.diagnosticos.length > 0) {
-	                    // Obtener el diagnóstico más reciente
+	                    // El diagnóstico se lee SIEMPRE de la nota clínica (nunca del navegador)
 	                    diagnosticoPaciente = notas.diagnosticos[0].diagnostico;
-	                    localStorage.setItem('ultimoDiagnostico', diagnosticoPaciente);
 	                }
 	            }
 	            
-	            // Si no hay diagnóstico, usar el guardado en localStorage o preguntar
-	            if (!diagnosticoPaciente) {
-	                diagnosticoPaciente = localStorage.getItem('ultimoDiagnostico');
-	            }
-	            
-	            if (diagnosticoPaciente && diagnosticoPaciente !== 'No hay diagnóstico registrado') {
+	            if (diagnosticoPaciente) {
 	                const res = await authFetch('/api/ia/explicar-diagnostico', {
 	                    method: 'POST',
 	                    body: JSON.stringify({ diagnostico: diagnosticoPaciente, nivelDetalle: 'simple' })

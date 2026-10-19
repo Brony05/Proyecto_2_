@@ -1,5 +1,6 @@
 // ==================== ADMINISTRATIVO - VARIABLES GLOBALES ====================
 let todasLasCitasAdmin = [];
+let todosLosPagos = [];
 
 // ==================== ADMINISTRATIVO - INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
@@ -21,6 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filtroEstadoAdmin')?.addEventListener('change', cargarCitasAdmin);
     document.getElementById('filtroDepartamentoAdmin')?.addEventListener('change', cargarCitasAdmin);
     document.getElementById('buscarPacienteAdmin')?.addEventListener('input', cargarPacientesAdmin);
+    document.getElementById('facturaFechaInicio')?.addEventListener('change', cargarFacturas);
+    document.getElementById('facturaFechaFin')?.addEventListener('change', cargarFacturas);
     
     // Tabs
     document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -39,10 +42,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ==================== ADMINISTRATIVO - HELPERS ====================
+async function cargarPagos() {
+    try {
+        const res = await authFetch('/api/pagos');
+        if (res.ok) {
+            todosLosPagos = await res.json();
+        }
+        return todosLosPagos;
+    } catch(e) {
+        return [];
+    }
+}
+
+function citasPagadas() {
+    return new Set(todosLosPagos.map(p => p.citaId));
+}
+
 // ==================== ADMINISTRATIVO - DASHBOARD ====================
 async function cargarDashboardAdmin() {
     setLoading(true);
     try {
+        await cargarPagos();
+        
         const resCitas = await authFetch('/api/citas');
         if (resCitas.ok) {
             todasLasCitasAdmin = await resCitas.json();
@@ -52,7 +74,10 @@ async function cargarDashboardAdmin() {
             const semanaStr = semanaAtras.toISOString().split('T')[0];
             
             const citasHoy = todasLasCitasAdmin.filter(c => c.fecha === hoy && c.estado !== 'CANCELADA');
-            const ingresosHoy = citasHoy.filter(c => c.estado === 'COMPLETADA').reduce((sum, c) => sum + (c.precio || 0), 0);
+            
+            // Ingresos reales: pagos cobrados hoy (por fecha de la cita)
+            const pagadasHoy = todosLosPagos.filter(p => p.citaFecha === hoy);
+            const ingresosHoy = pagadasHoy.reduce((sum, p) => sum + (p.monto || 0), 0);
             const citasSemana = todasLasCitasAdmin.filter(c => c.fecha >= semanaStr && c.fecha <= hoy && c.estado !== 'CANCELADA');
             
             document.getElementById('citasHoy').innerText = citasHoy.length;
@@ -60,17 +85,19 @@ async function cargarDashboardAdmin() {
             document.getElementById('citasSemana').innerText = citasSemana.length;
             
             // Citas del día
-            document.getElementById('tbodyCitasHoyAdmin').innerHTML = citasHoy.slice(0, 20).map(c => `
-                <tr>
-                    <td>${c.fecha || 'N/A'}</td>
-                    <td>${c.hora || 'N/A'}</td>
-                    <td>${c.cliente?.nombre || 'N/A'}</td>
-                    <td>${c.usuario?.nombreCompleto || c.usuario?.username || 'N/A'}</td>
-                    <td>${c.servicio || 'N/A'}</td>
-                    <td class="precio-text">${formatearPrecio(c.precio)}</td>
-                    <td>${obtenerBadgeEstado(c.estado)}</td>
-                </tr>
-            `).join('');
+            document.getElementById('tbodyCitasHoyAdmin').innerHTML = citasHoy.length
+                ? citasHoy.slice(0, 20).map(c => `
+                    <tr>
+                        <td>${c.fecha || 'N/A'}</td>
+                        <td>${c.hora || 'N/A'}</td>
+                        <td>${c.cliente?.nombre || 'N/A'}</td>
+                        <td>${c.usuario?.nombreCompleto || c.usuario?.username || 'N/A'}</td>
+                        <td>${c.servicio || 'N/A'}</td>
+                        <td class="precio-text">${formatearPrecio(c.precio)}</td>
+                        <td>${obtenerBadgeEstado(c.estado)}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="7" class="text-center text-muted">No hay citas para hoy</td></tr>';
         }
         
         const resPacientes = await authFetch('/api/clientes');
@@ -86,6 +113,8 @@ async function cargarDashboardAdmin() {
 async function cargarCitasAdmin() {
     setLoading(true);
     try {
+        await cargarPagos();
+        
         const res = await authFetch('/api/citas');
         if (res.ok) {
             let citas = await res.json();
@@ -93,28 +122,35 @@ async function cargarCitasAdmin() {
             const fechaFiltro = document.getElementById('filtroFechaAdmin')?.value;
             const estadoFiltro = document.getElementById('filtroEstadoAdmin')?.value;
             const deptoFiltro = document.getElementById('filtroDepartamentoAdmin')?.value;
+            const pagadas = citasPagadas();
             
             if (fechaFiltro) citas = citas.filter(c => c.fecha === fechaFiltro);
             if (estadoFiltro) citas = citas.filter(c => c.estado === estadoFiltro);
             if (deptoFiltro) citas = citas.filter(c => c.departamento === deptoFiltro);
             
-            document.getElementById('tbodyCitasAdmin').innerHTML = citas.map(c => `
-                <tr>
-                    <td>${c.id}</td>
-                    <td>${c.fecha || 'N/A'}</td>
-                    <td>${c.hora || 'N/A'}</td>
-                    <td>${c.cliente?.nombre || 'N/A'}</td>
-                    <td>${c.usuario?.nombreCompleto || c.usuario?.username || 'N/A'}</td>
-                    <td>${c.servicio || 'N/A'}</td>
-                    <td class="precio-text">${formatearPrecio(c.precio)}</td>
-                    <td><span class="badge-departamento ${c.departamento === 'PSICOLOGIA' ? 'badge-psicologia' : c.departamento === 'PSIQUIATRIA' ? 'badge-psiquiatria' : c.departamento === 'TRABAJO_SOCIAL' ? 'badge-trabajo-social' : c.departamento === 'ENFERMERIA' ? 'badge-enfermeria' : 'badge-administracion'}">${c.departamento || 'N/A'}</span></td>
-                    <td>${obtenerBadgeEstado(c.estado)}</td>
-                    <td>
-                        ${c.estado === 'COMPLETADA' && c.precio > 0 ? 
-                            `<button class="btn btn-sm btn-success" onclick="abrirModalPago(${c.id}, '${c.cliente?.nombre || ''}', '${c.servicio || ''}', ${c.precio || 0})">Cobrar</button>` : ''}
-                    </td>
-                </tr>
-            `).join('');
+            document.getElementById('tbodyCitasAdmin').innerHTML = citas.length
+                ? citas.map(c => {
+                    const yaPagada = pagadas.has(c.id);
+                    return `
+                        <tr>
+                            <td>${c.id}</td>
+                            <td>${c.fecha || 'N/A'}</td>
+                            <td>${c.hora || 'N/A'}</td>
+                            <td>${c.cliente?.nombre || 'N/A'}</td>
+                            <td>${c.usuario?.nombreCompleto || c.usuario?.username || 'N/A'}</td>
+                            <td>${c.servicio || 'N/A'}</td>
+                            <td class="precio-text">${formatearPrecio(c.precio)}</td>
+                            <td><span class="badge-departamento ${c.departamento === 'PSICOLOGIA' ? 'badge-psicologia' : c.departamento === 'PSIQUIATRIA' ? 'badge-psiquiatria' : c.departamento === 'TRABAJO_SOCIAL' ? 'badge-trabajo-social' : c.departamento === 'ENFERMERIA' ? 'badge-enfermeria' : 'badge-administracion'}">${c.departamento || 'N/A'}</span></td>
+                            <td>${obtenerBadgeEstado(c.estado)}</td>
+                            <td>
+                                ${c.estado === 'COMPLETADA' && c.precio > 0 && !yaPagada ? 
+                                    `<button class="btn btn-sm btn-success" onclick="abrirModalPago(${c.id}, '${(c.cliente?.nombre || '').replace(/'/g, "\\'")}', '${(c.servicio || '').replace(/'/g, "\\'")}', ${c.precio || 0})">Cobrar</button>` : 
+                                    (yaPagada ? '<span class="badge bg-success">Pagado</span>' : '')}
+                            </td>
+                        </tr>
+                    `;
+                }).join('')
+                : '<tr><td colspan="10" class="text-center text-muted">No hay citas para el filtro seleccionado</td></tr>';
         }
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -127,38 +163,78 @@ async function cargarFacturas() {
         const fechaInicio = document.getElementById('facturaFechaInicio')?.value || '2024-01-01';
         const fechaFin = document.getElementById('facturaFechaFin')?.value || new Date().toISOString().split('T')[0];
         
-        const res = await authFetch('/api/citas');
+        // Pagos reales dentro del rango de fechas de atención
+        const res = await authFetch(`/api/pagos/rango?inicio=${fechaInicio}&fin=${fechaFin}`);
         if (res.ok) {
-            let citas = await res.json();
-            citas = citas.filter(c => c.fecha >= fechaInicio && c.fecha <= fechaFin);
+            const pagos = await res.json();
+            todosLosPagos = pagos.length ? pagos : todosLosPagos;
             
-            const facturas = citas.filter(c => c.estado === 'COMPLETADA');
-            const totalFacturado = facturas.reduce((sum, c) => sum + (c.precio || 0), 0);
+            const totalFacturado = pagos.reduce((sum, p) => sum + (p.monto || 0), 0);
             
             document.getElementById('facturaTotal').innerHTML = '$' + totalFacturado.toLocaleString('es-MX');
-            document.getElementById('facturaCantidad').innerText = facturas.length;
-            document.getElementById('facturaPagadas').innerText = facturas.length; // Simulado
+            document.getElementById('facturaCantidad').innerText = pagos.length;
+            document.getElementById('facturaPagadas').innerText = pagos.length;
             
-            document.getElementById('tbodyFacturas').innerHTML = facturas.slice(0, 50).map((c, i) => `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td>${c.fecha || 'N/A'}</td>
-                    <td>${c.cliente?.nombre || 'N/A'}</td>
-                    <td>${c.servicio || 'N/A'}</td>
-                    <td class="precio-text">${formatearPrecio(c.precio)}</td>
-                    <td><span class="badge bg-success">Pagado</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="exportarFactura(${c.id})"><i class="fas fa-print"></i></button>
-                    </td>
-                </tr>
-            `).join('');
+            document.getElementById('tbodyFacturas').innerHTML = pagos.length
+                ? pagos.slice(0, 50).map(p => `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td>${p.citaFecha || 'N/A'}</td>
+                        <td>${p.pacienteNombre || 'N/A'}</td>
+                        <td>${p.servicio || 'N/A'}</td>
+                        <td class="precio-text">${formatearPrecio(p.monto)}</td>
+                        <td><span class="badge bg-info">${p.metodo || 'N/A'}</span></td>
+                        <td><span class="badge bg-success">Pagado</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="exportarFactura(${p.citaId})"><i class="fas fa-print"></i></button>
+                        </td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="8" class="text-center text-muted">Sin pagos en el rango seleccionado</td></tr>';
         }
     } catch(e) { console.error(e); }
     setLoading(false);
 }
 
-function exportarFactura(id) {
-    mostrarMensaje(`📄 Factura ${id} exportada (simulación)`, 'info');
+function exportarFactura(citaId) {
+    const pago = todosLosPagos.find(p => p.citaId === citaId);
+    if (!pago) {
+        mostrarMensaje('No hay pago registrado para esta cita', 'warning');
+        return;
+    }
+    
+    // Comprobante imprimible real
+    const ventana = window.open('', '_blank', 'width=600,height=700');
+    ventana.document.write(`
+        <html>
+        <head><title>Comprobante de pago - Cita #${citaId}</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h1 { font-size: 20px; border-bottom: 2px solid #1a237e; padding-bottom: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            td { padding: 6px 4px; }
+            td:first-child { font-weight: bold; width: 40%; }
+            .total { font-size: 18px; font-weight: bold; border-top: 1px solid #333; padding-top: 8px; }
+        </style></head>
+        <body>
+            <h1>Consultorio Psiquiátrico - Comprobante de pago</h1>
+            <table>
+                <tr><td>Folio:</td><td>PAGO-${String(pago.id).padStart(6, '0')}</td></tr>
+                <tr><td>Paciente:</td><td>${pago.pacienteNombre || 'N/A'}</td></tr>
+                <tr><td>Servicio:</td><td>${pago.servicio || 'N/A'}</td></tr>
+                <tr><td>Fecha de atención:</td><td>${pago.citaFecha || 'N/A'}</td></tr>
+                <tr><td>Método de pago:</td><td>${pago.metodo || 'N/A'}</td></tr>
+                <tr><td>Referencia:</td><td>${pago.referencia || 'N/A'}</td></tr>
+                <tr><td>Registrado por:</td><td>${pago.registradoPor || 'N/A'}</td></tr>
+                <tr><td>Fecha de cobro:</td><td>${pago.fecha ? new Date(pago.fecha).toLocaleString('es-MX') : 'N/A'}</td></tr>
+                <tr><td class="total">Total pagado:</td><td class="total">$${(pago.monto || 0).toFixed(2)} MXN</td></tr>
+            </table>
+            <p style="margin-top:24px; font-size:12px; color:#666;">Este documento es el comprobante oficial de su pago. Conserve para cualquier aclaración.</p>
+        </body></html>
+    `);
+    ventana.document.close();
+    ventana.focus();
+    ventana.print();
 }
 
 // ==================== ADMINISTRATIVO - PACIENTES ====================
@@ -175,11 +251,19 @@ async function cargarPacientesAdmin() {
             }
             
             const resCitas = await authFetch('/api/citas');
-            const todasCitas = await resCitas.json();
+            const todasCitas = await resCitas.ok ? await resCitas.json() : [];
+            
+            // Cobros reales por paciente (por nombre del pago)
+            const cobradoPorPaciente = {};
+            todosLosPagos.forEach(p => {
+                if (p.pacienteNombre) {
+                    cobradoPorPaciente[p.pacienteNombre] = (cobradoPorPaciente[p.pacienteNombre] || 0) + (p.monto || 0);
+                }
+            });
             
             document.getElementById('tbodyPacientesAdmin').innerHTML = pacientes.map(p => {
                 const citasPaciente = todasCitas.filter(c => c.cliente?.id === p.id);
-                const totalGastado = citasPaciente.filter(c => c.estado === 'COMPLETADA').reduce((sum, c) => sum + (c.precio || 0), 0);
+                const totalCobrado = cobradoPorPaciente[p.nombre] || 0;
                 return `
                     <tr>
                         <td>${p.id}</td>
@@ -187,9 +271,9 @@ async function cargarPacientesAdmin() {
                         <td>${p.telefono || 'N/A'}</td>
                         <td>${p.correo || 'N/A'}</td>
                         <td>${citasPaciente.length}</td>
-                        <td class="precio-text">${formatearPrecio(totalGastado)}</td>
+                        <td class="precio-text">${formatearPrecio(totalCobrado)}</td>
                         <td>
-                            <button class="btn btn-sm btn-info" onclick="verHistorialPaciente(${p.id})">Historial</button>
+                            <button class="btn btn-sm btn-info" onclick="verHistorialPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Historial</button>
                         </td>
                     </tr>
                 `;
@@ -199,8 +283,58 @@ async function cargarPacientesAdmin() {
     setLoading(false);
 }
 
-function verHistorialPaciente(id) {
-    mostrarMensaje(`📋 Historial del paciente ${id} (simulación)`, 'info');
+function verHistorialPaciente(id, nombre) {
+    const citasPaciente = todasLasCitasAdmin.filter(c => c.cliente?.id === id);
+    const pagosPaciente = todosLosPagos.filter(p => p.pacienteNombre === nombre);
+    
+    const modalHtml = `
+        <div class="modal fade" id="historialModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Historial: ${nombre || 'Paciente ' + id}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <h6>Citas (${citasPaciente.length})</h6>
+                        <table class="table table-sm">
+                            <thead><tr><th>Fecha</th><th>Hora</th><th>Servicio</th><th>Estado</th></tr></thead>
+                            <tbody>
+                                ${citasPaciente.length ? citasPaciente.map(c => `
+                                    <tr>
+                                        <td>${c.fecha || ''}</td>
+                                        <td>${c.hora || ''}</td>
+                                        <td>${c.servicio || ''}</td>
+                                        <td>${obtenerBadgeEstado(c.estado)}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="4" class="text-muted text-center">Sin citas</td></tr>'}
+                            </tbody>
+                        </table>
+                        <h6 class="mt-3">Cobros (${pagosPaciente.length})</h6>
+                        <table class="table table-sm">
+                            <thead><tr><th>Folio</th><th>Fecha cita</th><th>Monto</th><th>Método</th></tr></thead>
+                            <tbody>
+                                ${pagosPaciente.length ? pagosPaciente.map(p => `
+                                    <tr>
+                                        <td>PAGO-${String(p.id).padStart(6, '0')}</td>
+                                        <td>${p.citaFecha || ''}</td>
+                                        <td>${formatearPrecio(p.monto)}</td>
+                                        <td>${p.metodo || ''}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="4" class="text-muted text-center">Sin cobros</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('historialModal')?.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('historialModal')).show();
 }
 
 // ==================== ADMINISTRATIVO - PAGOS ====================
@@ -216,17 +350,28 @@ function abrirModalPago(id, paciente, servicio, monto) {
 
 async function registrarPago() {
     const citaId = document.getElementById('pagoCitaId').value;
+    const monto = parseFloat(document.getElementById('pagoMonto').innerText);
     const metodo = document.getElementById('pagoMetodo').value;
     const referencia = document.getElementById('pagoReferencia').value || 'Sin referencia';
     
     setLoading(true);
     try {
-        // Simular registro de pago
-        mostrarMensaje(`✅ Pago registrado para la cita ${citaId} - Método: ${metodo}`, 'success');
-        bootstrap.Modal.getInstance(document.getElementById('pagoModal')).hide();
-        cargarCitasAdmin();
-        cargarDashboardAdmin();
-        cargarFacturas();
+        const res = await authFetch('/api/pagos', {
+            method: 'POST',
+            body: JSON.stringify({ citaId: Number(citaId), monto, metodo, referencia })
+        });
+        
+        if (res.ok) {
+            const pago = await res.json();
+            mostrarMensaje(`✅ Pago registrado para la cita ${citaId} - Método: ${metodo} (Folio PAGO-${String(pago.id).padStart(6, '0')})`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('pagoModal')).hide();
+            cargarCitasAdmin();
+            cargarDashboardAdmin();
+            cargarFacturas();
+        } else {
+            const error = await res.text();
+            mostrarMensaje('❌ ' + error, 'danger');
+        }
     } catch(e) {
         mostrarMensaje('Error al registrar pago', 'danger');
     }

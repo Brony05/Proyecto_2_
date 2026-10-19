@@ -152,52 +152,72 @@ async function completarCitaTS(id) {
     }
 }
 
-// ==================== TRABAJADOR SOCIAL - PACIENTES ====================
+// ==================== TRABAJADOR SOCIAL - PACIENTES (CORREGIDO) ====================
 async function cargarPacientesTS() {
     setLoading(true);
     try {
         const resCitas = await authFetch('/api/citas');
-        if (resCitas.ok) {
-            const todasCitas = await resCitas.json();
-            const citasTS = todasCitas.filter(c => c.departamento === 'TRABAJO_SOCIAL');
-            const pacientesIds = [...new Set(citasTS.map(c => c.cliente?.id))];
-            
-            const resPacientes = await authFetch('/api/clientes');
-            if (resPacientes.ok) {
-                let pacientes = await resPacientes.json();
-                pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
-                
-                const termino = document.getElementById('buscarPacienteTS')?.value || '';
-                if (termino.length > 1) {
-                    pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
-                }
-                
-                document.getElementById('tbodyPacientesTS').innerHTML = pacientes.map(p => {
-                    const citasPaciente = citasTS.filter(c => c.cliente?.id === p.id);
-                    // Contar intervenciones (notas de tipo INTERVENCION)
-                    const resNotas = await authFetch(`/api/notas/doctor/paciente/${p.id}`).catch(() => null);
-                    let numIntervenciones = 0;
-                    if (resNotas && resNotas.ok) {
-                        const notas = await resNotas.json();
-                        numIntervenciones = notas.filter(n => n.tipo === 'INTERVENCION').length;
-                    }
-                    return `
-                        <tr>
-                            <td>${p.id}</td>
-                            <td>${p.nombre}</td>
-                            <td>${p.telefono || 'N/A'}</td>
-                            <td>${p.correo || 'N/A'}</td>
-                            <td>${citasPaciente.length}</td>
-                            <td><span class="badge bg-warning text-dark">${numIntervenciones}</span></td>
-                            <td>
-                                <button class="btn btn-sm btn-primary" onclick="verIntervencionesPaciente(${p.id}, '${p.nombre}')">Intervenciones</button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            }
+        if (!resCitas.ok) {
+            setLoading(false);
+            return;
         }
-    } catch(e) { console.error(e); }
+        
+        const todasCitas = await resCitas.json();
+        const citasTS = todasCitas.filter(c => c.departamento === 'TRABAJO_SOCIAL');
+        const pacientesIds = [...new Set(citasTS.map(c => c.cliente?.id))];
+        
+        const resPacientes = await authFetch('/api/clientes');
+        if (!resPacientes.ok) {
+            setLoading(false);
+            return;
+        }
+        
+        let pacientes = await resPacientes.json();
+        pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
+        
+        const termino = document.getElementById('buscarPacienteTS')?.value || '';
+        if (termino.length > 1) {
+            pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
+        }
+        
+        // ================================================================
+        // ⭐ CORRECCIÓN AQUÍ: Usar Promise.all para manejar async en map
+        // ================================================================
+        const pacientesConIntervenciones = await Promise.all(pacientes.map(async (p) => {
+            try {
+                const resNotas = await authFetch(`/api/notas/doctor/paciente/${p.id}`);
+                let numIntervenciones = 0;
+                if (resNotas && resNotas.ok) {
+                    const notas = await resNotas.json();
+                    numIntervenciones = notas.filter(n => n.tipo === 'INTERVENCION').length;
+                }
+                return { ...p, numIntervenciones };
+            } catch (e) {
+                return { ...p, numIntervenciones: 0 };
+            }
+        }));
+        
+        document.getElementById('tbodyPacientesTS').innerHTML = pacientesConIntervenciones.map(p => {
+            const citasPaciente = citasTS.filter(c => c.cliente?.id === p.id);
+            return `
+                <tr>
+                    <td>${p.id}</td>
+                    <td>${p.nombre}</td>
+                    <td>${p.telefono || 'N/A'}</td>
+                    <td>${p.correo || 'N/A'}</td>
+                    <td>${citasPaciente.length}</td>
+                    <td><span class="badge bg-warning text-dark">${p.numIntervenciones}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="verIntervencionesPaciente(${p.id}, '${p.nombre}')">Intervenciones</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+    } catch(e) { 
+        console.error('Error en cargarPacientesTS:', e);
+        document.getElementById('tbodyPacientesTS').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error al cargar pacientes</td></tr>';
+    }
     setLoading(false);
 }
 

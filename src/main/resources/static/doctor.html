@@ -119,6 +119,25 @@
         <!-- CALENDARIO -->
         <div id="calendario" class="tab-content" style="display:none;">
             <div class="calendar-container">
+                <div class="d-flex gap-2 mb-2 align-items-center">
+                    <label class="mb-0 fw-bold small">Estado:</label>
+                    <select id="filtroCalendarioEstado" class="form-select form-select-sm" style="width:auto;" onchange="cargarCalendario()">
+                        <option value="">Todos</option>
+                        <option value="AGENDADA">Agendadas</option>
+                        <option value="REAGENDADA">Reagendadas</option>
+                        <option value="EN_PROGRESO">En progreso</option>
+                        <option value="COMPLETADA">Completadas</option>
+                        <option value="CANCELADA">Canceladas</option>
+                    </select>
+                    <span class="ms-2">
+                        <span class="badge" style="background:#0d6efd;">Agendada</span>
+                        <span class="badge" style="background:#ffc107;color:#212529;">En progreso</span>
+                        <span class="badge" style="background:#6f42c1;">Reagendada</span>
+                        <span class="badge" style="background:#198754;">Completada</span>
+                        <span class="badge" style="background:#b6b6b6;color:#212529;
+                            border-top:1px dashed #999;border-bottom:1px dashed #999;">Cancelada</span>
+                    </span>
+                </div>
                 <div id="calendar"></div>
             </div>
         </div>
@@ -447,15 +466,12 @@
 	    .btn-diagnostico:hover, .btn-tratamiento:hover, .btn-consejos:hover { opacity: 0.9; transform: translateY(-2px); }
 	</style>
 
-	<!-- Agregar en el menú de tabs -->
-	<li class="nav-item"><button class="nav-link" data-tab="ia"><i class="fas fa-brain"></i> Asistente IA</button></li>
-
 	<!-- Contenido de la pestaña IA -->
 	<div id="ia" class="tab-content" style="display:none;">
 	    <div class="row">
 	        <div class="col-md-5">
 	            <div class="ia-panel-container">
-	                <h5><i class="fas fa-stethoscope"></i> Generar Contenido con IA</h5>
+	                <h5><i class="fas fa-stethoscope"></i> Mi Asistente IA Clínico</h5>
 	                <div class="mb-3">
 	                    <label class="form-label">Seleccionar Paciente</label>
 	                    <select id="iaPacienteId" class="form-select">
@@ -525,16 +541,35 @@
 
 	async function cargarPacientesIA() {
 	    try {
-	        const res = await authFetch('/api/clientes');
+	        // Solo MIS pacientes asignados (por citas atendidas)
+	        const res = await authFetch('/api/clientes/mis-pacientes');
 	        if (res.ok) {
 	            listaPacientes = await res.json();
 	            const select = document.getElementById('iaPacienteId');
 	            select.innerHTML = '<option value="">📋 Seleccionar paciente</option>' + 
 	                listaPacientes.map(p => `<option value="${p.id}">👤 ${p.nombre}</option>`).join('');
+	            if (listaPacientes.length === 0) {
+	                mostrarMensaje('ℹ️ Aún no tienes pacientes asignados. Aparecerán cuando tengas citas agendadas.', 'info');
+	            }
 	        }
 	    } catch(e) {
 	        console.error("Error cargando pacientes:", e);
 	    }
+	}
+
+	// Normaliza los marcadores de sección por si el modelo los escribe distinto
+	function normalizarMarcadoresIA(texto) {
+	    return String(texto || '')
+	        .replace(/\*\*/g, '')
+	        .replace(/===\s*DIAGN[ÓO]STICO\s*===/gi, '===DIAGNOSTICO===')
+	        .replace(/===\s*TRATAMIENTO\s*===/gi, '===TRATAMIENTO===')
+	        .replace(/===\s*CONSEJOS?\s*===/gi, '===CONSEJOS===');
+	}
+
+	function extraerSeccionIA(texto, marcador) {
+	    const re = new RegExp(`===${marcador}===\\s*\\n?([\\s\\S]*?)(?=\\n===|$)`, 'i');
+	    const m = texto.match(re);
+	    return m && m[1].trim() ? m[1].trim() : null;
 	}
 
 	async function generarContenidoIA() {
@@ -569,42 +604,25 @@
 	            })
 	        });
 	        
-	        if (res.ok) {
-	            const data = await res.json();
-	            let respuesta = data.recomendacion;
-	            
-	            console.log("Respuesta de IA:", respuesta);
-	            
-	            // Extraer secciones
-	            let diagnosticoExtraido = null;
-	            let tratamientoExtraido = null;
-	            let consejosExtraidos = null;
-	            
-	            // Buscar sección DIAGNOSTICO
-	            const diagMatch = respuesta.match(/===DIAGNOSTICO===\s*\n([\s\S]*?)(?=\n===|$)/i);
-	            if (diagMatch) {
-	                diagnosticoExtraido = diagMatch[1].trim();
-	            }
-	            
-	            // Buscar sección TRATAMIENTO
-	            const trataMatch = respuesta.match(/===TRATAMIENTO===\s*\n([\s\S]*?)(?=\n===|$)/i);
-	            if (trataMatch) {
-	                tratamientoExtraido = trataMatch[1].trim();
-	            }
-	            
-	            // Buscar sección CONSEJOS
-	            const consMatch = respuesta.match(/===CONSEJOS===\s*\n([\s\S]*?)(?=\n===|$)/i);
-	            if (consMatch) {
-	                consejosExtraidos = consMatch[1].trim();
-	            }
+        if (res.ok) {
+            const data = await res.json();
+            let respuesta = normalizarMarcadoresIA(data.recomendacion);
+            
+            console.log("Respuesta de IA:", respuesta);
+            
+            // Extraer secciones (parser tolerante)
+            let diagnosticoExtraido = extraerSeccionIA(respuesta, 'DIAGNOSTICO');
+            let tratamientoExtraido = extraerSeccionIA(respuesta, 'TRATAMIENTO');
+            let consejosExtraidos = extraerSeccionIA(respuesta, 'CONSEJOS');
 	            
 	            // Si no se encontró diagnóstico, usar el ingresado
 	            contenidoGenerado.diagnostico = diagnosticoExtraido || diagnostico;
 	            contenidoGenerado.tratamiento = tratamientoExtraido || "";
 	            contenidoGenerado.consejos = consejosExtraidos || "";
 	            
-	            resultadoDiv.innerHTML = `
-	                <div class="diagnostico-box">
+            resultadoDiv.innerHTML = `
+                <div class="text-muted small mb-2"><i class="fas fa-user text-primary"></i> Paciente: <strong>${pacienteSeleccionadoNombre || ''}</strong></div>
+                <div class="diagnostico-box">
 	                    <h6><i class="fas fa-stethoscope text-primary"></i> DIAGNÓSTICO</h6>
 	                    <p>${contenidoGenerado.diagnostico.replace(/\n/g, '<br>')}</p>
 	                </div>
@@ -651,11 +669,10 @@
 	            })
 	        });
 	        
-	        if (res.ok) {
-	            mostrarMensaje('✅ Diagnóstico guardado correctamente', 'success');
-	            document.getElementById('btnGuardarDiagnostico').style.display = 'none';
-	            localStorage.setItem('ultimoDiagnostico', contenidoGenerado.diagnostico);
-	        } else {
+        if (res.ok) {
+            mostrarMensaje('✅ Diagnóstico guardado en la nota de ' + (pacienteSeleccionadoNombre || 'el paciente'), 'success');
+            document.getElementById('btnGuardarDiagnostico').style.display = 'none';
+        } else {
 	            const error = await res.text();
 	            mostrarMensaje('❌ Error: ' + error, 'danger');
 	        }
@@ -673,14 +690,15 @@
 	    
 	    setLoading(true);
 	    try {
-	        const res = await authFetch('/api/notas', {
-	            method: 'POST',
-	            body: JSON.stringify({
-	                pacienteId: pacienteSeleccionadoId,
-	                tipo: 'RECOMENDACION',
-	                recomendaciones: contenidoGenerado.tratamiento
-	            })
-	        });
+        const res = await authFetch('/api/notas', {
+            method: 'POST',
+            body: JSON.stringify({
+                pacienteId: pacienteSeleccionadoId,
+                tipo: 'RECOMENDACION',
+                diagnostico: contenidoGenerado.diagnostico,
+                recomendaciones: contenidoGenerado.tratamiento
+            })
+        });
 	        
 	        if (res.ok) {
 	            mostrarMensaje('✅ Plan de tratamiento guardado correctamente', 'success');
@@ -703,14 +721,15 @@
 	    
 	    setLoading(true);
 	    try {
-	        const res = await authFetch('/api/notas', {
-	            method: 'POST',
-	            body: JSON.stringify({
-	                pacienteId: pacienteSeleccionadoId,
-	                tipo: 'CONSEJO',
-	                recomendaciones: contenidoGenerado.consejos
-	            })
-	        });
+        const res = await authFetch('/api/notas', {
+            method: 'POST',
+            body: JSON.stringify({
+                pacienteId: pacienteSeleccionadoId,
+                tipo: 'CONSEJO',
+                diagnostico: contenidoGenerado.diagnostico,
+                recomendaciones: contenidoGenerado.consejos
+            })
+        });
 	        
 	        if (res.ok) {
 	            mostrarMensaje('✅ Consejos guardados correctamente', 'success');
@@ -778,11 +797,25 @@
 	    }
 	});
 
+	// Verifica el estado del servicio de IA (Ollama)
+	async function verificarEstadoIA() {
+	    try {
+	        const res = await authFetch('/api/ia/status');
+	        if (res.ok) {
+	            const data = await res.json();
+	            if (!data.ollamaDisponible) {
+	                mostrarMensaje('⚠️ Servicio de IA no disponible: se usará un plan de respaldo. Inicia Ollama con: ollama run llama3.2:3b', 'warning');
+	            }
+	        }
+	    } catch(e) {}
+	}
+
 	// Cargar pacientes al cambiar a la pestaña IA
 	const iaTabButton = document.querySelector('[data-tab="ia"]');
 	if (iaTabButton) {
 	    iaTabButton.addEventListener('click', () => {
 	        cargarPacientesIA();
+	        verificarEstadoIA();
 	        document.getElementById('iaResultado').innerHTML = '<p class="text-muted text-center">Completa el formulario y haz clic en "Generar con IA"</p>';
 	        document.getElementById('btnGuardarDiagnostico').style.display = 'none';
 	        document.getElementById('btnGuardarTratamiento').style.display = 'none';

@@ -78,4 +78,26 @@ public class Cita {
     public void setAcompananteCorreo(String acompananteCorreo) { this.acompananteCorreo = acompananteCorreo; }
     public String getAcompananteRelacion() { return acompananteRelacion; }
     public void setAcompananteRelacion(String acompananteRelacion) { this.acompananteRelacion = acompananteRelacion; }
+    
+    /**
+     * Departamento de la cita, derivado del rol del especialista asignado (doctor).
+     * Es un campo calculado (no se persiste en la base de datos).
+     * El frontend filtra las citas por este campo (ej: 'TRABAJO_SOCIAL', 'ENFERMERIA').
+     */
+    @Transient
+    public String getDepartamento() {
+        if (doctor == null || doctor.getRol() == null) {
+            return null;
+        }
+        switch (doctor.getRol()) {
+            case "PSICOLOGO": return "PSICOLOGIA";
+            case "PSIQUIATRA": return "PSIQUIATRIA";
+            case "ENFERMERO": return "ENFERMERIA";
+            case "TRABAJADOR_SOCIAL": return "TRABAJO_SOCIAL";
+            case "DOCTOR": return doctor.getEspecialidad() != null 
+                    ? doctor.getEspecialidad().toUpperCase().replace('í', 'Í').replace('é', 'É').replace('á', 'Á').replace('ó', 'Ó').replace(' ', '_') 
+                    : null;
+            default: return null;
+        }
+    }
 }

@@ -2,6 +2,8 @@ package mx.com.ubam.isc.apijwt.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import mx.com.ubam.isc.apijwt.model.Usuario;
+import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.model.Cita;
 import mx.com.ubam.isc.apijwt.model.ListaEspera;
 import mx.com.ubam.isc.apijwt.model.Cliente;
@@ -23,10 +25,9 @@ public class CitaService {
     private CitaRepository citaRepository;
     
     @Autowired
-    private ListaEsperaRepository listaEsperaRepository;
+    private ListaEsperaRepository listaEsperaRepository;    @Autowired    private EmailService emailService;
     
-    @Autowired
-    private EmailService emailService;
+    @Autowired    private UsuarioRepository usuarioRepository;
 
     public List<Cita> listarTodas() {
         return citaRepository.findAll();
@@ -38,29 +39,77 @@ public class CitaService {
 
     public Cita actualizar(Cita cita) {
         return citaRepository.save(cita);
-    }
-
-    public boolean verificarDisponibilidad(LocalDate fecha, LocalTime hora) {
-        return citaRepository.verificarHorarioOcupado(fecha, hora).isEmpty();
-    }
-    
+    }    // NOTA: verificarDisponibilidad global (por fecha/hora en TODO el hospital) se eliminó:
+    // bloqueaba citas aunque los especialistas estuvieran libres. La disponibilidad real
+    // se valida por doctor con verificarDisponibilidadDoctor.
     public boolean verificarDisponibilidadDoctor(Long doctorId, LocalDate fecha, LocalTime hora) {
         List<Cita> citasDoctor = citaRepository.findByDoctorIdAndFecha(doctorId, fecha);
         return citasDoctor.stream().noneMatch(c -> c.getHora().equals(hora) && !"CANCELADA".equals(c.getEstado()));
     }
-
+    
     public List<String> getHorariosOcupados(LocalDate fecha) {
-        List<Cita> citas = citaRepository.findByFecha(fecha);
-        return citas.stream()
+        List<String> ocupados = new java.util.ArrayList<>();
+        // Un horario está ocupado solo si TODOS los especialistas están ocupados a esa hora;
+        // con pool = 1 especialista, coincide con su agenda.
+        long poolSize = Math.max(1, largoPoolEspecialistas());
+        Map<LocalTime, Long> ocupadasPorHora = citaRepository.findByFecha(fecha).stream()
                 .filter(c -> !"CANCELADA".equals(c.getEstado()))
-                .map(c -> c.getHora().format(DateTimeFormatter.ofPattern("HH:mm")))
-                .collect(Collectors.toList());
+                .collect(Collectors.groupingBy(Cita::getHora, Collectors.counting()));
+        ocupadasPorHora.forEach((hora, count) -> {
+            if (count >= poolSize) {
+                ocupados.add(hora.format(DateTimeFormatter.ofPattern("HH:mm")));
+            }
+        });
+        return ocupados;
+    }
+    
+    /** Cuántos especialistas están libres a esa fecha/hora (pool completo: Psirologos, Psiquiatras y DOCTORs) */
+    public long getEspecialesLibres(LocalDate fecha, LocalTime hora) {
+        long total = 0;
+        for (Usuario u : poolEspecialistas()) {
+            if (verificarDisponibilidadDoctor(u.getId(), fecha, hora)) {
+                total++;
+            }
+        }
+        return total;
+    }
+    
+    private long largoPoolEspecialistas() {
+        return Math.max(1, poolEspecialistas().size());
+    }
+    
+    private List<Usuario> poolEspecialistas() {
+        try {
+            List<Usuario> pool = new java.util.ArrayList<>();
+            pool.addAll(usuarioRepository.findByRol("PSIQUIATRA"));
+            pool.addAll(usuarioRepository.findByRol("PSICOLOGO"));
+            pool.addAll(usuarioRepository.findByRol("DOCTOR"));
+            return pool;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
+    /**
+     * La Consulta Inicial se hace UNA sola vez: si el paciente ya tiene una
+     * (activa o completada) ya NO puede agendar otra. Solo puede reintentarla
+     * si la misma cita fue CANCELADA.
+     */
     public boolean yaTieneConsultaInicial(Long clienteId) {
         List<Cita> citas = citaRepository.findByClienteId(clienteId);
         return citas.stream()
                 .anyMatch(c -> "Consulta Inicial".equals(c.getServicio()) 
+                        && !"CANCELADA".equals(c.getEstado()));
+    }
+    
+    /**
+     * Validación suave para reagendar: si ya hizo una Consulta Inicial (activa o completada)
+     * NO debe poder "reagendarla" a otro servicio para saltarse el bloqueo.
+     */
+    public boolean tuvoConsultasIniciales(Long clienteId) {
+        List<Cita> citas = citaRepository.findByClienteId(clienteId);
+        return citas.stream()
+                .anyMatch(c -> "Consulta Inicial".equals(c.getServicio())
                         && !"CANCELADA".equals(c.getEstado()));
     }
 
@@ -97,9 +146,8 @@ public class CitaService {
             throw new RuntimeException("Las citas solo se pueden agendar en punto o media hora (ej: 9:00, 9:30)");
         }
         
-        if (!verificarDisponibilidad(cita.getFecha(), cita.getHora())) {
-            throw new RuntimeException("El horario ya está ocupado. Por favor elige otra hora.");
-        }
+        // Ya NO se valida disponibilidad global: cada doctor tiene su propia agenda
+        // y la verificación por doctor se hace antes de llamar a este método.
         
         if (cita.getCliente() != null && yaTieneCitaEnFecha(cita.getCliente().getId(), cita.getFecha())) {
             throw new RuntimeException("Ya tienes una cita agendada para esta fecha. Solo puedes tener una cita por día.");
@@ -189,6 +237,12 @@ public class CitaService {
             if (!cita.getFecha().equals(nuevaFecha)) {
                 throw new RuntimeException("Ya tienes una cita agendada para esta fecha. Solo puedes tener una cita por día.");
             }
+        }
+        
+        // Protección extra: la cita de Consulta Inicial solo se mueve si no hay OTRAS consultas iniciales activas
+        if (cita.getCliente() != null && "Consulta Inicial".equals(cita.getServicio()) 
+                && yaTieneConsultaInicial(cita.getCliente().getId())) {
+            throw new RuntimeException("Ya existe otra Consulta Inicial activa para este paciente.");
         }
         
         LocalDate fechaOriginal = cita.getFecha();

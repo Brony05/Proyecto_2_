@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    // El Jefe de Archivo tiene su módulo propio de archivo clínico
+    if (sesion.rol === 'JEFE_ARCHIVO') {
+        window.location.href = '/jefe-archivo.html';
+        return;
+    }
+    
     document.getElementById('userName').innerText = localStorage.getItem('username');
     cargarModoOscuro();
     

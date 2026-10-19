@@ -1,6 +1,5 @@
 // ==================== JEFE ARCHIVO - VARIABLES GLOBALES ====================
 let listaExpedientes = [];
-let estadoExpediente = {};
 
 // ==================== JEFE ARCHIVO - INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
@@ -41,52 +40,51 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ==================== JEFE ARCHIVO - HELPERS ====================
+function badgeArchivo(estado) {
+    const estadoClass = estado === 'ACTIVO' ? 'archivo-activo' : 
+                       estado === 'INACTIVO' ? 'archivo-inactivo' : 
+                       estado === 'ARCHIVADO' ? 'archivo-archivado' : 'archivo-inactivo';
+    return `<span class="archivo-badge ${estadoClass}">${estado}</span>`;
+}
+
 // ==================== JEFE ARCHIVO - DASHBOARD ====================
 async function cargarDashboardArchivo() {
     setLoading(true);
     try {
-        const resPacientes = await authFetch('/api/clientes');
-        if (resPacientes.ok) {
-            const pacientes = await resPacientes.json();
-            document.getElementById('totalExpedientes').innerText = pacientes.length;
+        const res = await authFetch('/api/expedientes');
+        if (res.ok) {
+            listaExpedientes = await res.json();
             
-            // Simular estados de expedientes
-            const activos = Math.floor(pacientes.length * 0.7);
-            const archivados = Math.floor(pacientes.length * 0.2);
+            const total = listaExpedientes.length;
+            const activos = listaExpedientes.filter(e => e.estado === 'ACTIVO').length;
+            const archivados = listaExpedientes.filter(e => e.estado === 'ARCHIVADO').length;
+            
+            document.getElementById('totalExpedientes').innerText = total;
             document.getElementById('expedientesActivos').innerText = activos;
             document.getElementById('expedientesArchivados').innerText = archivados;
-        }
-        
-        const resNotas = await authFetch('/api/notas/doctor/paciente/1').catch(() => null);
-        if (resNotas && resNotas.ok) {
-            const notas = await resNotas.json();
-            document.getElementById('notasRegistradas').innerText = notas.length;
-        }
-        
-        // Últimos expedientes modificados (simulado)
-        const resCitas = await authFetch('/api/citas');
-        if (resCitas.ok) {
-            const citas = await resCitas.json();
-            const pacientesRecientes = [];
-            const vistos = new Set();
-            for (const c of citas.reverse()) {
-                if (!vistos.has(c.cliente?.id) && c.cliente) {
-                    vistos.add(c.cliente.id);
-                    pacientesRecientes.push(c.cliente);
-                    if (pacientesRecientes.length >= 5) break;
-                }
+            
+            // Conteo real de notas médicas registradas (desde la bitácora de auditoría)
+            const resNotas = await authFetch('/api/auditoria?accion=NOTA_MEDICA').catch(() => null);
+            if (resNotas && resNotas.ok) {
+                const auditoria = await resNotas.json();
+                document.getElementById('notasRegistradas').innerText = auditoria.total || 0;
             }
             
-            document.getElementById('tbodyUltimosExpedientes').innerHTML = pacientesRecientes.map(p => `
-                <tr>
-                    <td>${p.nombre}</td>
-                    <td>${new Date().toLocaleDateString()}</td>
-                    <td><span class="archivo-badge archivo-activo">Activo</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" onclick="verExpedientePaciente(${p.id})">Ver</button>
-                    </td>
-                </tr>
-            `).join('');
+            // Últimos expedientes modificados (reales, por fecha de actualización)
+            const ultimos = listaExpedientes.slice(0, 5);
+            document.getElementById('tbodyUltimosExpedientes').innerHTML = ultimos.length
+                ? ultimos.map(e => `
+                    <tr>
+                        <td>${e.pacienteNombre || 'N/A'}</td>
+                        <td>${e.fechaActualizacion ? new Date(e.fechaActualizacion).toLocaleDateString('es-MX') : 'N/A'}</td>
+                        <td>${badgeArchivo(e.estado)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="verExpedientePaciente(${e.pacienteId})">Ver</button>
+                        </td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="4" class="text-center text-muted">No hay expedientes registrados</td></tr>';
         }
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -96,74 +94,137 @@ async function cargarDashboardArchivo() {
 async function cargarExpedientes() {
     setLoading(true);
     try {
-        const res = await authFetch('/api/clientes');
+        const res = await authFetch('/api/expedientes');
         if (res.ok) {
-            let pacientes = await res.json();
+            listaExpedientes = await res.json();
+            
             const termino = document.getElementById('buscarExpediente')?.value || '';
             const estado = document.getElementById('filtroEstadoExpediente')?.value;
             
+            let filtered = listaExpedientes;
             if (termino.length > 1) {
-                pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
+                filtered = filtered.filter(e => (e.pacienteNombre || '').toLowerCase().includes(termino.toLowerCase()));
             }
-            
-            // Simular estado de expedientes
-            const estados = ['ACTIVO', 'ACTIVO', 'ACTIVO', 'INACTIVO', 'ARCHIVADO'];
-            const notasCount = [3, 5, 2, 8, 1, 4, 6, 2, 3, 7];
-            
-            let filtered = pacientes;
             if (estado) {
-                filtered = pacientes.filter((p, i) => {
-                    const estadoPaciente = estados[i % estados.length];
-                    return estadoPaciente === estado;
-                });
+                filtered = filtered.filter(e => e.estado === estado);
             }
             
-            document.getElementById('tbodyExpedientes').innerHTML = filtered.map((p, i) => {
-                const estadoPaciente = estados[i % estados.length];
-                const estadoClass = estadoPaciente === 'ACTIVO' ? 'archivo-activo' : 
-                                   estadoPaciente === 'INACTIVO' ? 'archivo-inactivo' : 'archivo-archivado';
-                return `
+            document.getElementById('tbodyExpedientes').innerHTML = filtered.length
+                ? filtered.map(e => `
                     <tr>
-                        <td>${p.id}</td>
-                        <td>${p.nombre}</td>
-                        <td>${p.telefono || 'N/A'}</td>
-                        <td>${p.correo || 'N/A'}</td>
-                        <td><span class="archivo-badge ${estadoClass}">${estadoPaciente}</span></td>
-                        <td>${notasCount[i % notasCount.length]}</td>
-                        <td>${new Date().toLocaleDateString()}</td>
+                        <td>${e.pacienteId}</td>
+                        <td>${e.pacienteNombre || 'N/A'}</td>
+                        <td>${e.pacienteTelefono || 'N/A'}</td>
+                        <td>${e.pacienteCorreo || 'N/A'}</td>
+                        <td>${badgeArchivo(e.estado)}</td>
+                        <td>${e.numeroNotas || 0}</td>
+                        <td>${e.fechaActualizacion ? new Date(e.fechaActualizacion).toLocaleDateString('es-MX') : 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editarExpediente(${p.id}, '${p.nombre}')">Gestionar</button>
-                            <button class="btn btn-sm btn-info" onclick="verExpedientePaciente(${p.id})">Ver</button>
+                            <button class="btn btn-sm btn-primary" onclick="editarExpediente(${e.pacienteId}, '${(e.pacienteNombre || '').replace(/'/g, "\\'")}')">Gestionar</button>
+                            <button class="btn btn-sm btn-info" onclick="verExpedientePaciente(${e.pacienteId})">Ver</button>
                         </td>
                     </tr>
-                `;
-            }).join('');
+                `).join('')
+                : '<tr><td colspan="8" class="text-center text-muted">No hay expedientes que coincidan con el filtro</td></tr>';
         }
     } catch(e) { console.error(e); }
     setLoading(false);
 }
 
-function editarExpediente(id, nombre) {
-    document.getElementById('expedientePacienteId').value = id;
-    document.getElementById('expedientePacienteNombre').innerText = nombre;
-    document.getElementById('expedienteEstado').value = 'ACTIVO';
-    document.getElementById('expedienteNotas').value = '';
+function editarExpediente(pacienteId, nombre) {
+    const expediente = listaExpedientes.find(e => e.pacienteId === pacienteId);
+    
+    document.getElementById('expedientePacienteId').value = pacienteId;
+    document.getElementById('expedientePacienteNombre').innerText = nombre || `Paciente ${pacienteId}`;
+    document.getElementById('expedienteEstado').value = expediente?.estado || 'ACTIVO';
+    document.getElementById('expedienteNotas').value = expediente?.observaciones || '';
     new bootstrap.Modal(document.getElementById('expedienteModal')).show();
 }
 
-function guardarExpediente() {
+async function guardarExpediente() {
     const pacienteId = document.getElementById('expedientePacienteId').value;
     const estado = document.getElementById('expedienteEstado').value;
     const notas = document.getElementById('expedienteNotas').value;
     
-    mostrarMensaje(`✅ Expediente de paciente ${pacienteId} actualizado a ${estado}`, 'success');
-    bootstrap.Modal.getInstance(document.getElementById('expedienteModal')).hide();
-    cargarExpedientes();
-    cargarDashboardArchivo();
+    setLoading(true);
+    try {
+        const res = await authFetch('/api/expedientes', {
+            method: 'POST',
+            body: JSON.stringify({ pacienteId: Number(pacienteId), estado, observaciones: notas })
+        });
+        
+        if (res.ok) {
+            mostrarMensaje(`✅ Expediente del paciente ${pacienteId} actualizado a ${estado}`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('expedienteModal')).hide();
+            cargarExpedientes();
+            cargarDashboardArchivo();
+            cargarPacientesArchivo();
+        } else {
+            const error = await res.text();
+            mostrarMensaje('❌ ' + error, 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
 }
 
-function verExpedientePaciente(id) {
-    mostrarMensaje(`📋 Viendo expediente completo del paciente ${id}`, 'info');
+async function verExpedientePaciente(pacienteId) {
+    setLoading(true);
+    try {
+        const res = await authFetch(`/api/expedientes/paciente/${pacienteId}`);
+        if (!res.ok) {
+            mostrarMensaje('No se pudo cargar el expediente', 'danger');
+            setLoading(false);
+            return;
+        }
+        
+        const expediente = await res.json();
+        
+        // Notas clínicas del paciente (acceso de lectura de Archivo Clínico)
+        let notasHtml = '';
+        const resNotas = await authFetch(`/api/notas/doctor/paciente/${pacienteId}`).catch(() => null);
+        if (resNotas && resNotas.ok) {
+            const notas = await resNotas.json();
+            notasHtml = notas.length
+                ? notas.slice(0, 10).map(n => `
+                    <li class="list-group-item">
+                        <strong>${n.tipo}</strong> — ${new Date(n.fechaCreacion).toLocaleString('es-MX')}
+                        <br><small>${n.diagnostico || n.medicamentos || n.recomendaciones || ''}</small>
+                    </li>
+                `).join('')
+                : '<li class="list-group-item text-muted">Sin notas clínicas registradas</li>';
+        }
+        
+        const modalHtml = `
+            <div class="modal fade" id="verExpedienteModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Expediente: ${expediente.pacienteNombre || 'Paciente ' + pacienteId}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p><strong>Estado del expediente:</strong> ${badgeArchivo(expediente.estado)}</p>
+                            <p><strong>Observaciones de archivo:</strong> ${expediente.observaciones || 'Ninguna'}</p>
+                            <p><strong>Última actualización:</strong> ${expediente.fechaActualizacion ? new Date(expediente.fechaActualizacion).toLocaleString('es-MX') : 'N/A'}</p>
+                            <h6 class="mt-3">Notas clínicas del paciente</h6>
+                            <ul class="list-group">${notasHtml}</ul>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('verExpedienteModal')?.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        new bootstrap.Modal(document.getElementById('verExpedienteModal')).show();
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
 }
 
 // ==================== JEFE ARCHIVO - PACIENTES ====================
@@ -179,31 +240,26 @@ async function cargarPacientesArchivo() {
                 pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
             }
             
-            // Simular estados
-            const estados = ['ACTIVO', 'ACTIVO', 'INACTIVO', 'ARCHIVADO', 'ACTIVO'];
+            // Mapa de expedientes por pacienteId para estado real
+            const expedientesPorPaciente = {};
+            listaExpedientes.forEach(e => {
+                expedientesPorPaciente[e.pacienteId] = e;
+            });
             
-            // Obtener notas
-            const resNotas = await authFetch('/api/notas/doctor/paciente/1').catch(() => null);
-            let totalNotas = 0;
-            if (resNotas && resNotas.ok) {
-                const notas = await resNotas.json();
-                totalNotas = notas.length;
-            }
-            
-            document.getElementById('tbodyPacientesArchivo').innerHTML = pacientes.map((p, i) => {
-                const estado = estados[i % estados.length];
-                const estadoClass = estado === 'ACTIVO' ? 'archivo-activo' : 
-                                   estado === 'INACTIVO' ? 'archivo-inactivo' : 'archivo-archivado';
+            document.getElementById('tbodyPacientesArchivo').innerHTML = pacientes.map(p => {
+                const expediente = expedientesPorPaciente[p.id];
+                const estado = expediente?.estado || 'SIN_EXPEDIENTE';
+                const notasCount = expediente?.numeroNotas || 0;
                 return `
                     <tr>
                         <td>${p.id}</td>
                         <td>${p.nombre}</td>
                         <td>${p.telefono || 'N/A'}</td>
                         <td>${p.correo || 'N/A'}</td>
-                        <td><span class="archivo-badge ${estadoClass}">${estado}</span></td>
-                        <td>${totalNotas || Math.floor(Math.random() * 10) + 1}</td>
+                        <td>${badgeArchivo(estado)}</td>
+                        <td>${notasCount}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editarExpediente(${p.id}, '${p.nombre}')">Gestionar</button>
+                            <button class="btn btn-sm btn-primary" onclick="editarExpediente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Gestionar</button>
                             <button class="btn btn-sm btn-info" onclick="verExpedientePaciente(${p.id})">Ver</button>
                         </td>
                     </tr>
@@ -221,50 +277,28 @@ async function cargarAuditoria() {
         const fecha = document.getElementById('auditoriaFecha')?.value;
         const tipo = document.getElementById('auditoriaTipo')?.value;
         
-        // Simular auditoría
-        const acciones = ['CREACION', 'MODIFICACION', 'CONSULTA', 'ARCHIVO', 'MODIFICACION', 'CONSULTA'];
-        const usuarios = ['admin', 'psicologo1', 'psiquiatra1', 'enfermero1', 'director'];
-        const pacientes = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Torres'];
-        const detalles = [
-            'Creación de expediente',
-            'Actualización de diagnóstico',
-            'Consulta de historial',
-            'Archivo de expediente',
-            'Modificación de datos',
-            'Consulta de notas'
-        ];
+        let url = '/api/auditoria';
+        const params = [];
+        if (fecha) params.push(`fecha=${fecha}`);
+        if (tipo) params.push(`accion=${tipo}`);
+        if (params.length) url += '?' + params.join('&');
         
-        let items = [];
-        const hoy = new Date();
-        for (let i = 0; i < 15; i++) {
-            const d = new Date(hoy);
-            d.setHours(d.getHours() - i * 2);
-            items.push({
-                fecha: d,
-                usuario: usuarios[i % usuarios.length],
-                paciente: pacientes[i % pacientes.length],
-                accion: acciones[i % acciones.length],
-                detalle: detalles[i % detalles.length]
-            });
+        const res = await authFetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            const registros = data.registros || [];
+            
+            document.getElementById('tbodyAuditoria').innerHTML = registros.length
+                ? registros.map(r => `
+                    <tr>
+                        <td>${new Date(r.fecha).toLocaleString('es-MX')}</td>
+                        <td>${r.usuario}</td>
+                        <td><span class="badge ${r.accion === 'CREACION' ? 'bg-success' : r.accion === 'MODIFICACION' ? 'bg-warning' : r.accion === 'CANCELACION' || r.accion === 'LOGIN_FALLIDO' ? 'bg-danger' : 'bg-info'}">${r.accion}</span></td>
+                        <td>${r.detalle}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="4" class="text-center text-muted">Sin registros de auditoría para el filtro seleccionado</td></tr>';
         }
-        
-        if (fecha) {
-            items = items.filter(item => item.fecha.toISOString().split('T')[0] === fecha);
-        }
-        if (tipo) {
-            items = items.filter(item => item.accion === tipo);
-        }
-        
-        document.getElementById('tbodyAuditoria').innerHTML = items.map(item => `
-            <tr>
-                <td>${item.fecha.toLocaleString()}</td>
-                <td>${item.usuario}</td>
-                <td>${item.paciente}</td>
-                <td><span class="badge ${item.accion === 'CREACION' ? 'bg-success' : item.accion === 'MODIFICACION' ? 'bg-warning' : item.accion === 'ARCHIVO' ? 'bg-danger' : 'bg-info'}">${item.accion}</span></td>
-                <td>${item.detalle}</td>
-            </tr>
-        `).join('');
-        
     } catch(e) { console.error(e); }
     setLoading(false);
 }
