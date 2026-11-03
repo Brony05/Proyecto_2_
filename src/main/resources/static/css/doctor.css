@@ -1,0 +1,329 @@
+/* ============================================================
+   DOCTOR — REDISEÑO 2026
+   Se carga solo en doctor.html. styles.css sigue intacto para
+   el resto de vistas; este archivo sobreescribe/decora.
+   ============================================================ */
+
+:root {
+    --doc-primario: #667eea;
+    --doc-secundario: #764ba2;
+    --doc-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --doc-fondo: #f4f6fb;
+    --doc-tinta: #2d3142;
+    --doc-muted: #6b7280;
+    --doc-card: #ffffff;
+    --doc-borde: #e8ecf4;
+    --doc-verde: #10b981;
+    --doc-amarillo: #f59e0b;
+    --doc-rojo: #ef4444;
+    --doc-cyan: #06b6d4;
+    --doc-sombra: 0 10px 30px rgba(45, 49, 66, 0.08);
+    --doc-sombra-hover: 0 18px 40px rgba(102, 126, 234, 0.18);
+    --doc-radio: 18px;
+}
+
+/* ==================== FONDO ==================== */
+body.doctor-body {
+    background:
+        radial-gradient(ellipse 60% 40% at 10% 0%, rgba(102, 126, 234, 0.12), transparent),
+        radial-gradient(ellipse 50% 45% at 95% 10%, rgba(118, 75, 162, 0.10), transparent),
+        var(--doc-fondo);
+    color: var(--doc-tinta);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+}
+
+/* ==================== NAVBAR ==================== */
+.doctor-body .navbar-custom {
+    background: var(--doc-grad);
+    padding: 14px 22px;
+    box-shadow: 0 6px 24px rgba(102, 126, 234, 0.35);
+}
+.doctor-body .nav-usuario {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50px; padding: 6px 16px 6px 8px;
+    backdrop-filter: blur(6px);
+}
+.doctor-body .nav-usuario .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9); color: var(--doc-secundario);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+}
+.doctor-body .nav-usuario .nombre { color: #fff; font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctor-body .nav-usuario .rol-chip {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(255,255,255,.25); padding: 2px 8px; border-radius: 10px;
+}
+.doctor-body .badge-especialidad {
+    background: rgba(255,255,255,.25) !important;
+    color: #fff !important; border: 1px solid rgba(255,255,255,.35);
+    border-radius: 50px; font-weight: 600; padding: 5px 12px; font-size: 11px;
+}
+
+/* ==================== TABS PÍLDORA ==================== */
+.doctor-body .nav-tabs { gap: 8px; border-bottom: none; flex-wrap: wrap; }
+.doctor-body .nav-tabs .nav-link {
+    border: none; border-radius: 14px; padding: 11px 20px;
+    font-weight: 600; background: var(--doc-card); color: var(--doc-muted);
+    box-shadow: var(--doc-sombra); display: flex; align-items: center; gap: 8px;
+    transition: all 0.25s ease;
+}
+.doctor-body .nav-tabs .nav-link i { font-size: 15px; }
+.doctor-body .nav-tabs .nav-link:hover { transform: translateY(-2px); color: var(--doc-primario); }
+.doctor-body .nav-tabs .nav-link.active {
+    background: var(--doc-grad); color: #fff;
+    box-shadow: 0 6px 18px rgba(102, 126, 234, 0.4);
+}
+
+/* ==================== KPI / STAT CARDS ==================== */
+.stat-card {
+    border: none !important; border-radius: var(--doc-radio) !important;
+    background: var(--doc-card) !important;
+    box-shadow: var(--doc-sombra) !important;
+    padding: 22px 24px !important; margin-bottom: 14px;
+    position: relative; overflow: hidden;
+    transition: transform .22s ease, box-shadow .22s ease;
+    animation: docAparecer .35s ease both;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: var(--doc-sombra-hover) !important; }
+.stat-card::after {
+    content: ''; position: absolute; right: -24px; bottom: -24px;
+    width: 110px; height: 110px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(102,126,234,.10), rgba(118,75,162,.10));
+}
+.stat-card i {
+    position: absolute; top: 20px; right: 20px; font-size: 20px;
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    z-index: 1;
+}
+.stat-card i.fa-calendar-check { background: var(--doc-primario); }
+.stat-card i.fa-spinner      { background: var(--doc-amarillo); }
+.stat-card i.fa-check-circle { background: var(--doc-verde); }
+.stat-card .number {
+    font-size: 40px !important; font-weight: 800 !important;
+    color: var(--doc-tinta) !important; text-align: left !important;
+    line-height: 1.1; margin: 26px 0 4px;
+}
+.stat-card .label { color: var(--doc-muted) !important; font-weight: 600; font-size: 13px; text-align: left !important; }
+
+/* ==================== PANELES / TABLAS ==================== */
+.panel-card {
+    background: var(--doc-card);
+    border: 1px solid var(--doc-borde);
+    border-radius: var(--doc-radio);
+    box-shadow: var(--doc-sombra);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    animation: docAparecer .35s ease both;
+}
+.panel-titulo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 17px; margin-bottom: 16px;
+    color: var(--doc-tinta);
+}
+.panel-titulo i { color: var(--doc-primario); }
+.panel-titulo .ico {
+    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px;
+}
+.ico-cal { background: var(--doc-grad); }
+.ico-verde { background: var(--doc-verde); }
+.ico-azul { background: var(--doc-primario); }
+.ico-amar { background: var(--doc-amarillo); }
+.ico-brain { background: linear-gradient(135deg, #764ba2, #667eea); }
+
+.doctor-body .table-container {
+    background: var(--doc-card); border: 1px solid var(--doc-borde);
+    border-radius: var(--doc-radio); box-shadow: var(--doc-sombra);
+    padding: 22px 24px; margin-top: 0; border: 1px solid var(--doc-borde);
+}
+.doctor-body .table-container h5 {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 17px; margin-bottom: 16px;
+}
+.doctor-body .table-container h5 i { color: var(--doc-primario); }
+.doctor-body .table { margin-bottom: 0; }
+.doctor-body .table thead th {
+    background: #f8f9ff; border: none; border-bottom: 2px solid var(--doc-borde) !important;
+    color: var(--doc-muted); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: .8px; font-weight: 700; padding: 10px 12px;
+    white-space: nowrap;
+}
+.doctor-body .table tbody td {
+    vertical-align: middle; padding: 12px; font-size: 14px;
+    border-bottom: 1px solid var(--doc-borde);
+}
+.doctor-body .table tbody tr { transition: background .15s ease; }
+.doctor-body .table tbody tr:hover { background: #f6f8ff; }
+.doctor-body .table tbody tr:last-child td { border-bottom: none; }
+
+/* Pills de estado (coinciden con la vista paciente) */
+.pill-estado {
+    padding: 6px 14px; border-radius: 50px; font-size: 11px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    white-space: nowrap; display: inline-block;
+}
+.pill-agendada    { background: #eef2ff; color: #6366f1; }
+.pill-completada  { background: #ecfdf5; color: #059669; }
+.pill-cancelada   { background: #fef2f2; color: #dc2626; }
+.pill-reagendada  { background: #fffbeb; color: #b45309; }
+.pill-en_progreso { background: #ecfeff; color: #0891b2; }
+
+/* Botones rediseñados */
+.doctor-body .btn { border-radius: 12px; font-weight: 600; }
+.doctor-body .btn-sm { border-radius: 10px; }
+.doctor-body .btn-primary-controller, .doctor-body .btn-primary {
+    background: var(--doc-grad); border: none;
+}
+.doctor-body .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(102,126,234,.4); }
+.doctor-body .btn-primary:disabled { transform: none; box-shadow: none; opacity: .6; }
+.doctor-body .form-control, .doctor-body .form-select {
+    border-radius: 12px; border: 1.5px solid var(--doc-borde);
+    padding: 9px 14px; font-size: 14px;
+}
+.doctor-body .form-control:focus, .doctor-body .form-select:focus {
+    border-color: var(--doc-primario); box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+}
+.doctor-body .filter-section {
+    background: var(--doc-card); border: 1px solid var(--doc-borde);
+    border-radius: var(--doc-radio); box-shadow: var(--doc-sombra);
+    padding: 16px 20px; margin-bottom: 18px;
+}
+
+/* ==================== DASHBOARD: GRÁFICAS ==================== */
+.grafica-panel { padding: 20px; }
+.grafica-panel canvas { max-height: 260px; }
+
+/* ==================== CALENDARIO ==================== */
+.doctor-body .calendar-container {
+    background: var(--doc-card); border: 1px solid var(--doc-borde);
+    border-radius: var(--doc-radio); box-shadow: var(--doc-sombra); padding: 20px;
+}
+.doctor-body .fc { font-family: inherit; }
+.doctor-body .fc .fc-toolbar-title { font-size: 18px; font-weight: 800; color: var(--doc-tinta); }
+.doctor-body .fc .fc-button {
+    background: #f2f4ff; border: none; color: var(--doc-primario);
+    font-weight: 600; border-radius: 10px; padding: 7px 14px; font-size: 13px;
+}
+.doctor-body .fc .fc-button:hover { background: var(--doc-grad); color: #fff; }
+.doctor-body .fc .fc-button-active, .doctor-body .fc .fc-button:active {
+    background: var(--doc-grad) !important; color: #fff !important;
+}
+.doctor-body .fc-theme-standard td, .doctor-body .fc-theme-standard th,
+.doctor-body .fc-theme-standard .fc-scrollgrid { border-color: var(--doc-borde) !important; }
+.doctor-body .fc .fc-daygrid-day.fc-day-today { background: rgba(102,126,234,.08) !important; }
+
+/* Leyenda de estados */
+.leyenda-estados { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.leyenda-estados .pill-estado { font-size: 10px; }
+
+/* ==================== LISTA DE PACIENTES (NOTAS) ==================== */
+.doctor-body .paciente-item {
+    cursor: pointer; padding: 12px 16px; margin-bottom: 10px;
+    border-radius: 14px; background: var(--doc-card);
+    border: 1px solid var(--doc-borde);
+    border-left: 4px solid var(--doc-primario);
+    transition: all 0.2s; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 4px 14px rgba(45,49,66,.06);
+}
+.doctor-body .paciente-item:hover {
+    background-color: #f6f8ff; transform: translateX(4px);
+    box-shadow: 0 8px 20px rgba(102,126,234,.15);
+}
+.doctor-body .paciente-item.selected {
+    background-color: #f0f4ff; border-left: 4px solid var(--doc-verde);
+}
+.doctor-body .paciente-item .paciente-avatar {
+    width: 42px; height: 42px; flex: 0 0 42px; background: var(--doc-grad);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.doctor-body .paciente-item .paciente-nombre strong { font-size: 15px; }
+
+/* ==================== NOTAS MÉDICAS ==================== */
+.doctor-body .nota-card {
+    background: #f8f9fd; border-radius: 14px; padding: 15px 18px;
+    margin-bottom: 12px; border-left: 4px solid var(--doc-primario);
+    transition: transform .2s ease;
+    animation: docAparecer .3s ease both;
+}
+.doctor-body .nota-card:hover { transform: translateY(-2px); }
+.doctor-body .nota-tipo-diagnostico   { border-left-color: var(--doc-primario); }
+.doctor-body .nota-tipo-recomendacion { border-left-color: var(--doc-verde); }
+.doctor-body .nota-tipo-medicamento   { border-left-color: var(--doc-amarillo); }
+.doctor-body .nota-tipo-consejo       { border-left-color: var(--doc-cyan); }
+
+.info-paciente-seleccionado {
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
+    border-radius: 14px; padding: 10px 16px; margin-bottom: 16px;
+}
+
+/* ==================== PANEL IA ==================== */
+.ia-panel-container {
+    background: var(--doc-card);
+    border: 1px solid var(--doc-borde);
+    border-radius: var(--doc-radio);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--doc-sombra);
+}
+.ia-panel-container h5 {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 17px; margin-bottom: 16px;
+}
+.ia-panel-container h5 i { color: var(--doc-primario); }
+.ia-resultado {
+    background: #f8f9fd; padding: 20px; border-radius: 14px;
+    min-height: 350px; overflow-y: auto; white-space: pre-wrap;
+    line-height: 1.6; border: 1px solid var(--doc-borde);
+}
+.ia-loading { text-align: center; padding: 50px; color: var(--doc-primario); }
+.ia-error {
+    color: #b91c1c; background: #fef2f2; padding: 15px;
+    border-radius: 12px; border-left: 4px solid var(--doc-rojo);
+}
+.diagnostico-box {
+    background: #eef2ff; border-left: 4px solid var(--doc-primario);
+    padding: 15px 18px; border-radius: 12px; margin-bottom: 15px;
+}
+.tratamiento-box {
+    background: #ecfdf5; border-left: 4px solid var(--doc-verde);
+    padding: 15px 18px; border-radius: 12px; margin-bottom: 15px;
+}
+.consejos-box {
+    background: #fffbeb; border-left: 4px solid var(--doc-amarillo);
+    padding: 15px 18px; border-radius: 12px; margin-bottom: 15px;
+}
+.separador-ia { border-top: 2px dashed var(--doc-borde); margin: 18px 0; }
+.btn-diagnostico  { background: var(--doc-primario) !important; color: #fff !important; border: none !important; }
+.btn-tratamiento  { background: var(--doc-verde) !important; color: #fff !important; border: none !important; }
+.btn-consejos     { background: var(--doc-amarillo) !important; color: #fff !important; border: none !important; }
+.btn-diagnostico:hover, .btn-tratamiento:hover, .btn-consejos:hover { opacity: .92; transform: translateY(-2px); }
+
+/* ==================== MODAL / CRONÓMETRO ==================== */
+.doctor-body .modal-content {
+    border-radius: var(--doc-radio); border: none;
+    box-shadow: 0 24px 70px rgba(45,49,66,.35);
+}
+.doctor-body .modal-header { border-bottom: 1px solid var(--doc-borde); border-radius: var(--doc-radio) var(--doc-radio) 0 0; }
+.doctor-body .modal-footer { border-top: 1px solid var(--doc-borde); }
+.cronometro-container {
+    background: var(--doc-grad); border-radius: 16px;
+    padding: 22px 20px; text-align: center; color: #fff;
+}
+
+/* ==================== ANIMACIÓN ==================== */
+@keyframes docAparecer { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .stat-card .number { font-size: 32px !important; }
+    .doctor-body .nav-tabs .nav-link { padding: 10px 14px; font-size: 13px; }
+    .doctor-body .table { font-size: 13px; }
+}
+
+/* Clase antigua re-mapeada para no romper heredados */
+.doctor-body .welcome-card, .doctor-body .btn-nueva-cita { /* eliminados del HTML nuevo */ }

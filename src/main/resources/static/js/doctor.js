@@ -3,6 +3,12 @@ let calendar = null;
 let citaActualId = null;
 let pacienteSeleccionadoIdNota = null;
 
+/** Pill reutilizable de estado de cita (mismo lenguaje visual que la vista paciente). */
+function doctorPillEstado(estado) {
+    const map = { AGENDADA: 'Agendada', CANCELADA: 'Cancelada', REAGENDADA: 'Reagendada', COMPLETADA: 'Completada', EN_PROGRESO: 'En Progreso' };
+    return `<span class="pill-estado pill-${(estado || 'AGENDADA').toLowerCase()}">${map[estado] || estado}</span>`;
+}
+
 // ==================== CRONÓMETRO EN REVERSA ====================
 let cronometroInterval = null;
 let tiempoRestanteSegundos = 0;
@@ -167,8 +173,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    document.getElementById('doctorName').innerText = localStorage.getItem('username');
+    const nombreDoctor = localStorage.getItem('username') || 'Doctor';
+    document.getElementById('doctorName').innerText = nombreDoctor;
     document.getElementById('doctorEspecialidad').innerText = localStorage.getItem('especialidad') || 'Médico General';
+    document.getElementById('doctorAvatar').innerText = nombreDoctor.charAt(0).toUpperCase();
     
     cargarDashboardDoctor();
     cargarCitasDoctor();
@@ -176,17 +184,20 @@ document.addEventListener('DOMContentLoaded', function() {
     cargarPacientesParaNotas();
     
     // Eventos de filtros
+    // OJO: si guardas el elemento en una const con el MISMO nombre que la funcion
+    // (buscarPaciente / buscarPacienteNota), la const sombrea a la funcion y el
+    // listener recibe un elemento (no invocable): TypeError y tabs sin bind.
     const filtroFecha = document.getElementById('filtroFecha');
     const filtroEstado = document.getElementById('filtroEstado');
     const filtroEspecialidad = document.getElementById('filtroEspecialidad');
-    const buscarPaciente = document.getElementById('buscarPaciente');
-    const buscarPacienteNota = document.getElementById('buscarPacienteNota');
+    const elBuscarPaciente = document.getElementById('buscarPaciente');
+    const elBuscarPacienteNota = document.getElementById('buscarPacienteNota');
     
     if (filtroFecha) filtroFecha.addEventListener('change', () => cargarCitasDoctor());
     if (filtroEstado) filtroEstado.addEventListener('change', () => cargarCitasDoctor());
     if (filtroEspecialidad) filtroEspecialidad.addEventListener('change', () => cargarCitasDoctor());
-    if (buscarPaciente) buscarPaciente.addEventListener('input', buscarPaciente);
-    if (buscarPacienteNota) buscarPacienteNota.addEventListener('input', buscarPacienteNota);
+    if (elBuscarPaciente) elBuscarPaciente.addEventListener('input', buscarPaciente);
+    if (elBuscarPacienteNota) elBuscarPacienteNota.addEventListener('input', buscarPacienteNota);
     
     // Tabs
     document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -292,20 +303,97 @@ async function cargarDashboardDoctor() {
             const proximas = citasFiltradas.filter(c => c.fecha >= hoy && c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA').slice(0, 10);
             const tbodyProximasCitas = document.getElementById('tbodyProximasCitas');
             if (tbodyProximasCitas) {
-                tbodyProximasCitas.innerHTML = proximas.map(c => `
+                tbodyProximasCitas.innerHTML = proximas.length === 0
+                    ? '<tr><td colspan="7" class="text-center text-muted">No tienes citas pendientes. ¡Buen trabajo!</td></tr>'
+                    : proximas.map(c => `
                     <tr>
-                        <td>${formatearFecha(c.fecha)}</td>
+                        <td><strong>${formatearFecha(c.fecha)}</strong></td>
                         <td>${c.hora}</td>
                         <td>${c.cliente?.nombre || 'N/A'}</td>
                         <td>${c.servicio || 'N/A'}</td>
                         <td>${c.acompananteNombre ? c.acompananteNombre + ' (' + (c.acompananteRelacion || '-') + ')' : '-'}</td>
-                        <td><span class="badge-estado ${c.estado === 'AGENDADA' ? 'badge-agendada' : 'badge-progreso'}">${c.estado === 'AGENDADA' ? 'Agendada' : 'En Progreso'}</span></td>
+                        <td>${doctorPillEstado(c.estado)}</td>
                         <td>${c.estado === 'AGENDADA' ? `<button class="btn btn-sm btn-success" onclick="abrirIniciarCita(${c.id})"><i class="fas fa-play"></i> Iniciar Consulta</button>` : ''}</td>
                     </tr>
                 `).join('');
             }
+            
+            graficarDashboard(citasFiltradas);
         }
     } catch(e) { console.error(e); }
+}
+
+// ==================== DOCTOR - GRÁFICAS (Chart.js) ====================
+let graficoMeses = null;
+let graficoEstados = null;
+
+function graficarDashboard(citas) {
+    if (typeof Chart === 'undefined') return;
+    
+    // --- Dona: distribución por estado ---
+    const conteoEstados = {};
+    citas.forEach(c => { conteoEstados[c.estado] = (conteoEstados[c.estado] || 0) + 1; });
+    const ordenEstados = ['AGENDADA', 'EN_PROGRESO', 'COMPLETADA', 'REAGENDADA', 'CANCELADA'];
+    const etiquetasEstados = ordenEstados.filter(e => conteoEstados[e]);
+    const datosEstados = etiquetasEstados.map(e => conteoEstados[e]);
+    const COLOR_ESTADO = { AGENDADA: '#667eea', EN_PROGRESO: '#f59e0b', COMPLETADA: '#10b981', REAGENDADA: '#764ba2', CANCELADA: '#9ca3af' };
+    
+    const ctxEstados = document.getElementById('graficaEstados');
+    if (ctxEstados) {
+        if (graficoEstados) graficoEstados.destroy();
+        if (datosEstados.length === 0) {
+            const panel = ctxEstados.closest('.grafica-panel');
+            let aviso = panel.querySelector('.aviso-sin-datos');
+            if (!aviso) {
+                aviso = document.createElement('div');
+                aviso.className = 'aviso-sin-datos text-center text-muted small py-3';
+                aviso.innerText = 'Sin citas todavía';
+                panel.appendChild(aviso);
+            }
+        } else {
+            graficoEstados = new Chart(ctxEstados, {
+                type: 'doughnut',
+                data: {
+                    labels: etiquetasEstados.map(e => e === 'EN_PROGRESO' ? 'En progreso' : e.charAt(0) + e.slice(1).toLowerCase()),
+                    datasets: [{ data: datosEstados, backgroundColor: etiquetasEstados.map(e => COLOR_ESTADO[e]), borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+                }
+            });
+        }
+    }
+    
+    // --- Barras: citas de los últimos 6 meses ---
+    const hoy = new Date();
+    const meses = [];
+    const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        meses.push({ clave: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, etiqueta: nombresMeses[d.getMonth()] });
+    }
+    const datosMeses = meses.map(m => citas.filter(c => (c.fecha || '').startsWith(m.clave) && c.estado !== 'CANCELADA').length);
+    
+    const ctxMeses = document.getElementById('graficaMeses');
+    if (ctxMeses) {
+        if (graficoMeses) graficoMeses.destroy();
+        graficoMeses = new Chart(ctxMeses, {
+            type: 'bar',
+            data: {
+                labels: meses.map(m => m.etiqueta),
+                datasets: [{
+                    label: 'Citas', data: datosMeses,
+                    backgroundColor: 'rgba(102,126,234,.75)', borderRadius: 8, maxBarThickness: 34
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+            }
+        });
+    }
 }
 
 // ==================== DOCTOR - CITAS ====================

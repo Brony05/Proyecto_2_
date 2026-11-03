@@ -6,173 +6,139 @@
     <title>Login - Consultorio Psiquiátrico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .login-card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-            margin: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: fadeIn 0.5s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .login-card h2 {
-            text-align: center;
-            color: #667eea;
-            margin-bottom: 30px;
-            font-weight: bold;
-        }
-        .login-card input {
-            border-radius: 10px;
-            border: 1px solid #ddd;
-            padding: 12px 15px;
-            margin-bottom: 15px;
-            width: 100%;
-            font-size: 16px;
-        }
-        .login-card button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 12px;
-            width: 100%;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            transition: transform 0.2s;
-        }
-        .login-card button:hover {
-            transform: translateY(-2px);
-        }
-        .btn-registro {
-            background: transparent;
-            border: 2px solid #667eea;
-            color: #667eea;
-            margin-top: 10px;
-        }
-        .btn-registro:hover {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-        }
-        .separador {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            margin: 20px 0;
-        }
-        .separador::before,
-        .separador::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1px solid #ddd;
-        }
-        .separador span {
-            padding: 0 10px;
-            color: #999;
-        }
-        .loading {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10000;
-        }
-        .alert-custom {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            min-width: 280px;
-            animation: slideIn 0.3s ease;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-    </style>
+    <link rel="stylesheet" href="/css/auth.css">
 </head>
-<body>
+<body class="auth-body">
 
-<div class="loading" id="loading">
-    <div class="spinner-border text-primary" role="status">
+<div style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:11000;" id="loading">
+    <div class="spinner-border text-light" role="status">
         <span class="visually-hidden">Cargando...</span>
     </div>
 </div>
 
-<div class="login-card">
-    <h2><i class="fas fa-brain"></i> Consultorio Psiquiátrico</h2>
-    
-    <form id="loginForm">
-        <input type="text" id="username" class="form-control" placeholder="Usuario" required>
-        <input type="password" id="password" class="form-control" placeholder="Contraseña" required>
-        <button type="submit">
-            <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
-        </button>
-        <div id="errorMsg" class="text-danger mt-3 text-center"></div>
-    </form>
+<section class="auth-hero">
+    <div class="marca"><i class="fas fa-brain"></i> Consultorio Psiquiátrico</div>
+    <h1>Tu bienestar mental,<br>a un click de distancia</h1>
+    <p class="subtitulo">Agenda tus consultas, lleva tu historial clínico y habla con nuestro asistente de bienestar, todo desde un solo lugar.</p>
+    <ul class="auth-beneficios">
+        <li><i class="fas fa-calendar-check"></i> Agenda y reagenda tus citas en segundos</li>
+        <li><i class="fas fa-file-medical"></i> Tu historial y diagnósticos siempre a la mano</li>
+        <li><i class="fas fa-comments"></i> Asistente IA que explica tus diagnósticos</li>
+    </ul>
+</section>
 
-    <div class="separador">
-        <span>o</span>
+<section class="auth-panel">
+    <div class="auth-card">
+        <div class="titulo-form"><i class="fas fa-right-to-bracket"></i> Bienvenido de vuelta</div>
+        <p class="texto-muted">Inicia sesión para entrar a tu panel</p>
+
+        <form id="loginForm" novalidate>
+            <div class="campo" id="campoUsuario">
+                <label for="username">Usuario</label>
+                <div class="input-grupo">
+                    <i class="fas fa-user izq"></i>
+                    <input type="text" id="username" class="form-control" placeholder="Tu usuario" autocomplete="username" required>
+                </div>
+                <div class="hint-error">Escribe tu usuario</div>
+            </div>
+
+            <div class="campo" id="campoPassword">
+                <label for="password">Contraseña</label>
+                <div class="input-grupo">
+                    <i class="fas fa-lock izq"></i>
+                    <input type="password" id="password" class="form-control" placeholder="Tu contraseña" autocomplete="current-password" required>
+                    <button type="button" class="input-ojo" id="ojoPassword" tabindex="-1"><i class="fas fa-eye"></i></button>
+                </div>
+                <div class="hint-error">Escribe tu contraseña</div>
+            </div>
+
+            <div id="errorMsg" class="text-center mt-3" style="display:none; color:#ef4444; font-weight:600; font-size:14px;">
+                <i class="fas fa-circle-exclamation"></i> Credenciales inválidas
+            </div>
+
+            <div class="auth-botones">
+                <button type="submit" class="auth-btn-principal" id="btnLogin">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                </button>
+                <div class="auth-separador"><span>o</span></div>
+                <button type="button" class="auth-btn-secundario" onclick="window.location.href='/registro.html'">
+                    <i class="fas fa-user-plus"></i> ¿Nuevo paciente? Regístrate aquí
+                </button>
+            </div>
+        </form>
     </div>
-
-    <button type="button" class="btn-registro" onclick="window.location.href='/registro.html'">
-        <i class="fas fa-user-plus"></i> ¿Nuevo paciente? Regístrate aquí
-    </button>
-</div>
+</section>
 
 <script>
     function setLoading(show) {
-        document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
     }
 
     function mostrarMensaje(mensaje, tipo = 'success') {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${tipo} alert-custom`;
-        alertDiv.innerHTML = `<i class="fas fa-${tipo === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${mensaje}`;
-        document.body.appendChild(alertDiv);
-        setTimeout(() => alertDiv.remove(), 3000);
+        const toast = document.createElement('div');
+        toast.className = `auth-toast ${tipo}`;
+        toast.innerHTML = `<i class="fas fa-${tipo === 'success' ? 'circle-check' : 'circle-exclamation'}"></i> ${mensaje}`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('ocultando');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
+
+    // Mostrar/ocultar contraseña
+    document.getElementById('ojoPassword').addEventListener('click', () => {
+        const input = document.getElementById('password');
+        const ojo = document.querySelector('#ojoPassword i');
+        const visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        ojo.className = visible ? 'fas fa-eye' : 'fas fa-eye-slash';
+    });
+
+    // Validación en vivo
+    document.getElementById('username').addEventListener('input', function () {
+        document.getElementById('campoUsuario').classList.toggle('valido', this.value.trim().length > 0);
+        document.getElementById('errorMsg').style.display = 'none';
+    });
+    document.getElementById('password').addEventListener('input', function () {
+        document.getElementById('campoPassword').classList.toggle('valido', this.value.length > 0);
+        document.getElementById('errorMsg').style.display = 'none';
+    });
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const username = document.getElementById('username').value;
+        const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
-        
+        const errorBox = document.getElementById('errorMsg');
+
+        errorBox.style.display = 'none';
+        errorBox.innerText = '';
+
+        let valido = true;
+        if (!username) { document.getElementById('campoUsuario').classList.add('invalido'); valido = false; }
+        else { document.getElementById('campoUsuario').classList.remove('invalido'); }
+        if (!password) { document.getElementById('campoPassword').classList.add('invalido'); valido = false; }
+        else { document.getElementById('campoPassword').classList.remove('invalido'); }
+        if (!valido) return;
+
         setLoading(true);
+        document.getElementById('btnLogin').disabled = true;
         try {
-            // ✅ Asegúrate que la URL sea correcta
             const response = await fetch('/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
-                
+
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
                 localStorage.setItem('rol', data.rol);
                 if (data.especialidad) localStorage.setItem('especialidad', data.especialidad);
-                
-                mostrarMensaje(`✅ ¡Bienvenido ${data.username}!`, 'success');
-                
+
+                mostrarMensaje(`¡Bienvenido ${data.username}!`, 'success');
+
                 // Redirigir según el rol
                 setTimeout(() => {
                     const rol = data.rol;
@@ -186,24 +152,25 @@
                     else if (rol === 'ENFERMERO') window.location.href = '/enfermero.html';
                     else if (rol === 'TRABAJADOR_SOCIAL') window.location.href = '/trabajador-social.html';
                     else if (rol === 'ADMINISTRATIVO') window.location.href = '/administrativo.html';
-                    else if (rol === 'JEFE_PSICOLOGIA' || rol === 'JEFE_PSIQUIATRIA' || 
+                    else if (rol === 'JEFE_PSICOLOGIA' || rol === 'JEFE_PSIQUIATRIA' ||
                              rol === 'JEFE_TRABAJO_SOCIAL' || rol === 'JEFE_ENFERMERIA') window.location.href = '/jefe.html';
                     else if (rol === 'JEFE_ARCHIVO') window.location.href = '/jefe-archivo.html';
                     else if (rol === 'COMITE_ETICA') window.location.href = '/comite-etica.html';
                     else window.location.href = '/';
                 }, 1000);
-                
+
             } else {
-                const error = await response.text();
-                document.getElementById('errorMsg').innerText = '❌ Credenciales inválidas';
-                mostrarMensaje('❌ Error de autenticación', 'danger');
+                errorBox.style.display = 'block';
+                mostrarMensaje('Error de autenticación', 'danger');
             }
         } catch (error) {
             console.error('Error:', error);
-            document.getElementById('errorMsg').innerText = '❌ Error de conexión';
-            mostrarMensaje('❌ Error de conexión', 'danger');
+            errorBox.innerText = 'Error de conexión';
+            errorBox.style.display = 'block';
+            mostrarMensaje('Error de conexión', 'danger');
         }
         setLoading(false);
+        document.getElementById('btnLogin').disabled = false;
     });
 </script>
 </body>

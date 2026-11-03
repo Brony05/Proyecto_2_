@@ -64,8 +64,10 @@ public class IaController {
                 paciente = clienteRepository.findByCorreoIgnoreCase(claveCorreo).orElse(null);
             }
             if (paciente == null) return "";
-            List<NotaMedica> diagnosticos = notaRepository.findByPacienteAndTipo(paciente, "DIAGNOSTICO");
-            List<NotaMedica> recomendaciones = notaRepository.findByPacienteAndTipo(paciente, "RECOMENDACION");
+            // Orden DESC por fecha: diagnosticos.get(0) es el diagnóstico VIGENTE
+            // (el más reciente), no "el primero que devuelva la BD" sin orden.
+            List<NotaMedica> diagnosticos = notaRepository.findByPacienteAndTipoOrderByFechaCreacionDescIdDesc(paciente, "DIAGNOSTICO");
+            List<NotaMedica> recomendaciones = notaRepository.findByPacienteAndTipoOrderByFechaCreacionDescIdDesc(paciente, "RECOMENDACION");
             StringBuilder sb = new StringBuilder();
             if (!diagnosticos.isEmpty()) {
                 sb.append("Diagnóstico actual: ").append(diagnosticos.get(0).getDiagnostico()).append(". ");

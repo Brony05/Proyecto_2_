@@ -124,7 +124,7 @@ public class IaService {
                 (historialNotas != null && !historialNotas.isBlank())
                         ? "Historial relevante: \"" + historialNotas + "\"" : "");
 
-        String respuesta = llamarOllama(system, prompt, 600, 0.35);
+        String respuesta = llamarOllama(system, prompt, 450, 0.35);
 
         if (respuesta == null || respuesta.isBlank() || respuesta.startsWith("⚠")) {
             return generarRespuestaManual(diagnostico);
@@ -208,8 +208,8 @@ public class IaService {
                 diagnostico,
                 simple ? "muy sencilla, como para un adolescente" : "clara, con un nivel de detalle mayor",
                 simple ? "" : "Puede usar términos clínicos sencillos y explicarlos. ",
-                simple ? 120 : 170);
-        return llamarOllama(system, prompt, 350, 0.45);
+                simple ? 100 : 140);
+        return llamarOllama(system, prompt, 200, 0.45);
     }
 
     /**
@@ -232,11 +232,11 @@ public class IaService {
 
             Máximo 160 palabras en total. No mencione medicamentos ni dosis.
             """, categoria);
-        return llamarOllama(system, prompt, 350, 0.45);
+        return llamarOllama(system, prompt, 250, 0.45);
     }
 
     /**
-     * Chat libre. La mejoría del bot depende del rol del usuario autenticado:
+     * Chat libre. La persona del bot depende del rol del usuario autenticado:
      *  - DOCTOR  -> asistente clínico (soporte en la decisión médica)
      *  - PACIENTE -> asistente psicoeducativo (sin prescripciones)
      */
@@ -255,7 +255,7 @@ public class IaService {
 
                 La doctora plantea: %s
 
-                Responda en español, con un máximo de 200 palabras y esta estructura exacta:
+                Responda en español, con un máximo de 150 palabras y esta estructura exacta:
 
                 Evaluación:
                 (1 a 3 frases que resuman la situación clínica planteada)
@@ -275,7 +275,7 @@ public class IaService {
                 """,
                     contexto == null || contexto.isBlank() ? "No proporcionado" : contexto,
                     mensajeUsuario);
-            return llamarOllama(system, prompt, 400, 0.35);
+            return llamarOllama(system, prompt, 300, 0.35);
         } else {
             String system = SISTEMA_BASE + """
                 Asistente PSICOEDUCATIVO del paciente: acompaña con calidez y sobriedad \
@@ -286,7 +286,7 @@ public class IaService {
 
                 El paciente escribe: %s
 
-                Responda en español, con un máximo de 130 palabras y esta estructura exacta:
+                Responda en español, con un máximo de 100 palabras y esta estructura exacta:
 
                 Respuesta:
                 (conteste de forma clara y respetuosa en 1 o 2 frases)
@@ -303,7 +303,7 @@ public class IaService {
                 """,
                     contexto == null || contexto.isBlank() ? "No proporcionado" : contexto,
                     mensajeUsuario);
-            return llamarOllama(system, prompt, 350, 0.45);
+            return llamarOllama(system, prompt, 250, 0.45);
         }
     }
 
@@ -320,6 +320,9 @@ public class IaService {
             requestBody.put("system", system);
             requestBody.put("prompt", prompt);
             requestBody.put("stream", false);
+            // Rendimiento: mantiene el modelo cargado en memoria (arranque en frío
+            // medido: ~7s extra por llamada si Ollama lo descarga tras 5 min de inactividad).
+            requestBody.put("keep_alive", "15m");
             requestBody.put("options", Map.of(
                 "temperature", temperatura,
                 "top_p", 0.9,
@@ -330,7 +333,7 @@ public class IaService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(OLLAMA_URL))
-                    .timeout(Duration.ofSeconds(120))
+                    .timeout(Duration.ofSeconds(240))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();

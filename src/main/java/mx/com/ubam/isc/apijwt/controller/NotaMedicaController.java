@@ -164,10 +164,12 @@ public class NotaMedicaController {
                 paciente = clienteRepository.save(paciente);
             }
             
-            List<NotaMedica> diagnosticos = notaRepository.findByPacienteAndTipo(paciente, "DIAGNOSTICO");
-            List<NotaMedica> recomendaciones = notaRepository.findByPacienteAndTipo(paciente, "RECOMENDACION");
-            List<NotaMedica> medicamentos = notaRepository.findByPacienteAndTipo(paciente, "MEDICAMENTO");
-            List<NotaMedica> consejos = notaRepository.findByPacienteAndTipo(paciente, "CONSEJO");
+            // Ordenadas por fecha DESC: el elemento [0] que consumen el frontend
+            // y el bot de IA es el diagnóstico/recomendación vigente (más reciente).
+            List<NotaMedica> diagnosticos = notaRepository.findByPacienteAndTipoOrderByFechaCreacionDescIdDesc(paciente, "DIAGNOSTICO");
+            List<NotaMedica> recomendaciones = notaRepository.findByPacienteAndTipoOrderByFechaCreacionDescIdDesc(paciente, "RECOMENDACION");
+            List<NotaMedica> medicamentos = notaRepository.findByPacienteAndTipoOrderByFechaCreacionDescIdDesc(paciente, "MEDICAMENTO");
+            List<NotaMedica> consejos = notaRepository.findByPacienteAndTipoOrderByFechaCreacionDescIdDesc(paciente, "CONSEJO");
             
             Map<String, Object> response = new HashMap<>();
             response.put("diagnosticos", diagnosticos);

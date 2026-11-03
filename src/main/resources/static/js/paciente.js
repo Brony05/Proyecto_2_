@@ -2,6 +2,14 @@
 let servicioActual = null, precioActual = null, fechaActual = null, horaActual = null;
 let horaReagendarSeleccionada = null;
 
+/** Divide 'YYYY-MM-DD' en { dia, mes corto, largo } para las tarjetas de cita. */
+function partesFecha(fecha) {
+    const meses = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+    const p = String(fecha || '').split('-');
+    const m = parseInt(p[1]);
+    return { dia: p[2] || '?', mes: (m >= 1 && m <= 12) ? meses[m - 1] : '', largo: formatearFecha(fecha) };
+}
+
 // ==================== PACIENTE - INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
     const sesion = verificarSesion();
@@ -10,7 +18,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    document.getElementById('userName').innerText = localStorage.getItem('username');
+    const nombre = localStorage.getItem('username') || 'Paciente';
+    document.getElementById('userName').innerText = nombre;
+    document.getElementById('avatarInicial').innerText = nombre.charAt(0).toUpperCase();
+    document.getElementById('heroSaludo').innerText = '\u00A1Hola, ' + nombre + '! \uD83D\uDC4B';
+    document.getElementById('heroFecha').innerText = new Date().toLocaleDateString('es-MX',
+        { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     cargarCitas();
     cargarMensajesNoLeidos();
     
@@ -231,31 +244,35 @@ async function cargarCitas() {
             const ahora = new Date().toTimeString().slice(0, 5);
             
             if (citas.length === 0) {
-                container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-times" style="font-size: 50px; color: #ddd;"></i><p class="mt-3">No tienes citas agendadas</p><button class="btn btn-primary" onclick="abrirModalCita()">Agendar mi primera cita</button></div>`;
+                container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div style="font-size:64px">\u{1F4C5}</div><p class="mt-3 text-muted">Aun no tienes citas agendadas</p><button class="btn btn-primary-custom" onclick="abrirModalCita()">Agendar mi primera cita</button></div>`;
             } else {
                 container.innerHTML = citas.map(cita => {
                     const citaPasada = cita.fecha < hoyFecha || (cita.fecha === hoyFecha && cita.hora < ahora);
                     const mostrarCancelar = !citaPasada && cita.estado !== 'CANCELADA' && cita.estado !== 'COMPLETADA';
                     const mostrarReagendar = !citaPasada && cita.estado !== 'CANCELADA' && cita.estado !== 'COMPLETADA';
                     
-                    let estadoBadgeClass = 'bg-primary', estadoTexto = 'Agendada';
-                    if (cita.estado === 'CANCELADA') { estadoBadgeClass = 'bg-danger'; estadoTexto = 'Cancelada'; }
-                    else if (cita.estado === 'REAGENDADA') { estadoBadgeClass = 'bg-warning'; estadoTexto = 'Reagendada'; }
-                    else if (cita.estado === 'COMPLETADA') { estadoBadgeClass = 'bg-success'; estadoTexto = 'Completada'; }
-                    else if (cita.estado === 'EN_PROGRESO') { estadoBadgeClass = 'bg-info'; estadoTexto = 'En Progreso'; }
-                    
+                    const estadoTexto = { AGENDADA:'Agendada', CANCELADA:'Cancelada', REAGENDADA:'Reagendada', COMPLETADA:'Completada', EN_PROGRESO:'En Progreso' }[cita.estado] || 'Agendada';
+                    const partes = partesFecha(cita.fecha);
                     return `<div class="col-12 col-md-6 col-lg-4">
-                        <div class="cita-card">
+                        <div class="cita-card ${cita.estado === 'REAGENDADA' ? 're-agendada' : ''}">
+                            <div class="cita-fecha-bloque">
+                                <div class="calendario-mini">
+                                    <div class="dia">${partes.dia}</div>
+                                    <div class="mes">${partes.mes}</div>
+                                </div>
+                                <div>
+                                    <div class="cita-hora">${cita.hora}</div>
+                                    <div class="cita-dia-largo">${partes.largo}</div>
+                                </div>
+                            </div>
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
-                                    <div class="fecha"><i class="fas fa-calendar"></i> ${formatearFecha(cita.fecha)}</div>
-                                    <div class="hora"><i class="fas fa-clock"></i> ${cita.hora}</div>
-                                    <div><i class="fas fa-stethoscope"></i> ${cita.servicio || 'Consulta General'}</div>
+                                    <div class="servicio-linea"><i class="fas fa-stethoscope"></i> ${cita.servicio || 'Consulta General'}</div>
                                     ${cita.acompananteNombre ? `<div><i class="fas fa-user-friends"></i> Acompañante: ${cita.acompananteNombre} (${cita.acompananteRelacion || '-'})</div>` : ''}
                                     <div class="precio"><i class="fas fa-dollar-sign"></i> ${formatearPrecio(cita.precio)}</div>
                                     ${cita.estado === 'REAGENDADA' && cita.fechaOriginal ? `<div class="small text-warning mt-1"><i class="fas fa-exchange-alt"></i> Original: ${formatearFecha(cita.fechaOriginal)} ${cita.horaOriginal}</div>` : ''}
                                 </div>
-                                <span class="badge-estado ${estadoBadgeClass} text-white">${estadoTexto}</span>
+                                <span class="pill-estado pill-${(cita.estado || 'AGENDADA').toLowerCase()}">${estadoTexto}</span>
                             </div>
                             <hr>
                             <div class="d-flex gap-2 mt-2">
@@ -265,10 +282,26 @@ async function cargarCitas() {
                         </div>
                     </div>`;
                 }).join('');
+                proximaCitaHero(citas, hoyFecha, ahora);
             }
         }
     } catch (error) { mostrarMensaje('Error al cargar tus citas', 'danger'); }
     setLoading(false);
+}
+
+/** Muestra en el hero la siguiente cita futura (o la de hoy no completada). */
+function proximaCitaHero(citas, hoyFecha, ahora) {
+    const proxima = citas
+        .filter(c => c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA' && (c.fecha > hoyFecha || (c.fecha === hoyFecha && c.hora >= ahora)))
+        .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))[0];
+    const hero = document.getElementById('heroProximaCita');
+    if (proxima) {
+        document.getElementById('heroCitaTexto').innerText =
+            formatearFecha(proxima.fecha) + ' \u2022 ' + proxima.hora + ' \u2022 ' + (proxima.servicio || 'Consulta');
+        hero.style.display = 'flex';
+    } else {
+        hero.style.display = 'none';
+    }
 }
 
 async function cancelarCita(id) {
@@ -400,20 +433,32 @@ async function cargarHistoriaClinica() {
         if (res.ok) {
             const data = await res.json();
             
+            const diagHead = n => `<div class="nota-fecha">${n.doctor?.nombreCompleto || n.doctor?.username || 'Doctor'} \u2022 ${new Date(n.fechaCreacion).toLocaleDateString()}</div>`;
+            const destacado = document.getElementById('destacadoDiagnostico');
+            if (data.diagnosticos?.length > 0) {
+                destacado.style.display = 'block';
+                document.getElementById('destacadoTexto').innerText = data.diagnosticos[0].diagnostico;
+                document.getElementById('destacadoDoctor').innerText =
+                    (data.diagnosticos[0].doctor?.nombreCompleto || data.diagnosticos[0].doctor?.username || 'Tu doctor') +
+                    ' \u2022 ' + new Date(data.diagnosticos[0].fechaCreacion).toLocaleDateString();
+            } else {
+                destacado.style.display = 'none';
+            }
+            
             document.getElementById('diagnosticosContainer').innerHTML = data.diagnosticos?.length > 0 ?
-                data.diagnosticos.map(d => `<div class="nota-card"><strong>${d.doctor?.nombreCompleto || d.doctor?.username || 'Doctor'}</strong> - ${new Date(d.fechaCreacion).toLocaleDateString()}<p class="mt-2">${d.diagnostico}</p></div>`).join('') :
+                data.diagnosticos.map(d => `<div class="nota-card">${diagHead(d)}<p class="mt-2 mb-0">${d.diagnostico}</p></div>`).join('') :
                 '<p class="text-muted">No hay diagnósticos registrados.</p>';
             
             document.getElementById('recomendacionesContainer').innerHTML = data.recomendaciones?.length > 0 ?
-                data.recomendaciones.map(r => `<div class="nota-card"><strong>${r.doctor?.nombreCompleto || r.doctor?.username || 'Doctor'}</strong> - ${new Date(r.fechaCreacion).toLocaleDateString()}<p class="mt-2">${r.recomendaciones}</p></div>`).join('') :
+                data.recomendaciones.map(r => `<div class="nota-card">${diagHead(r)}<p class="mt-2 mb-0">${r.recomendaciones}</p></div>`).join('') :
                 '<p class="text-muted">No hay recomendaciones registradas.</p>';
             
             document.getElementById('medicamentosContainer').innerHTML = data.medicamentos?.length > 0 ?
-                data.medicamentos.map(m => `<div class="nota-card"><strong>${m.doctor?.nombreCompleto || m.doctor?.username || 'Doctor'}</strong> - ${new Date(m.fechaCreacion).toLocaleDateString()}<p class="mt-2">${m.medicamentos}</p></div>`).join('') :
+                data.medicamentos.map(m => `<div class="nota-card">${diagHead(m)}<p class="mt-2 mb-0">${m.medicamentos}</p></div>`).join('') :
                 '<p class="text-muted">No hay medicamentos recetados.</p>';
             
             document.getElementById('consejosContainer').innerHTML = data.consejos?.length > 0 ?
-                data.consejos.map(c => `<div class="nota-card"><strong>${c.doctor?.nombreCompleto || c.doctor?.username || 'Doctor'}</strong> - ${new Date(c.fechaCreacion).toLocaleDateString()}<p class="mt-2">${c.recomendaciones || c.diagnostico}</p></div>`).join('') :
+                data.consejos.map(c => `<div class="nota-card">${diagHead(c)}<p class="mt-2 mb-0">${c.recomendaciones || c.diagnostico}</p></div>`).join('') :
                 '<p class="text-muted">No hay consejos registrados.</p>';
         }
     } catch(e) { console.error(e); }
@@ -462,15 +507,19 @@ async function cargarMisSolicitudes() {
                 document.getElementById('misSolicitudes').innerHTML = '<p class="text-muted">No tienes solicitudes activas.</p>';
             } else {
                 document.getElementById('misSolicitudes').innerHTML = solicitudes.map(s => `
-                    <div class="solicitud-card d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>${s.servicioInteres}</strong><br>
-                            <small>Registrado: ${new Date(s.fechaRegistro).toLocaleString()}</small>
-                            ${s.fechaDeseada ? `<br><small>Fecha deseada: ${formatearFecha(s.fechaDeseada)}</small>` : ''}
-                            ${s.horarioPreferido ? `<br><small>Horario preferido: ${s.horarioPreferido}</small>` : ''}
-                            ${s.notificado ? '<br><span class="badge bg-success">Notificado</span>' : '<br><span class="badge bg-warning">En espera</span>'}
+                    <div class="solicitud-card">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${s.servicioInteres}</strong><br>
+                                <small class="text-muted">Registrado: ${new Date(s.fechaRegistro).toLocaleString()}</small>
+                                ${s.fechaDeseada ? `<br><small class="text-muted">Fecha deseada: ${formatearFecha(s.fechaDeseada)}</small>` : ''}
+                                ${s.horarioPreferido ? `<br><small class="text-muted">Horario preferido: ${s.horarioPreferido}</small>` : ''}
+                            </div>
+                            <div class="text-end">
+                                <span class="pill-estado ${s.notificado ? 'pill-notificado' : 'pill-espera'}">${s.notificado ? 'Notificado' : 'En espera'}</span>
+                                <button class="btn btn-sm btn-danger d-block mt-2" onclick="eliminarSolicitud(${s.id})">Cancelar</button>
+                            </div>
                         </div>
-                        <button class="btn btn-sm btn-danger" onclick="eliminarSolicitud(${s.id})">Cancelar</button>
                     </div>
                 `).join('');
             }
@@ -504,11 +553,13 @@ async function cargarMensajes() {
         if (res.ok) {
             const mensajes = await res.json();
             document.getElementById('mensajesContainer').innerHTML = mensajes.map(m => `
-                <div class="mensaje-card ${!m.leido ? 'mensaje-no-leido' : ''}" onclick="marcarComoLeido(${m.id})">
-                    <strong>De:</strong> ${m.remitente?.username}<br>
-                    <strong>Asunto:</strong> ${m.asunto}<br>
-                    <small>${new Date(m.fechaEnvio).toLocaleString()}</small>
-                    <p class="mt-2">${m.contenido}</p>
+                <div class="mensaje-card" onclick="marcarComoLeido(${m.id})" style="cursor:pointer;">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="mensaje-asunto">${m.asunto}${!m.leido ? ' <span class="pill-estado pill-en_progreso">Nuevo</span>' : ''}</div>
+                        <div class="mensaje-meta">${new Date(m.fechaEnvio).toLocaleString()}</div>
+                    </div>
+                    <div class="mensaje-meta">De: ${m.remitente?.username}</div>
+                    <p class="mt-2 mb-0">${m.contenido}</p>
                 </div>
             `).join('');
             if (mensajes.length === 0) document.getElementById('mensajesContainer').innerHTML = '<p class="text-muted">No tienes mensajes.</p>';

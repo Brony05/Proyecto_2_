@@ -6,54 +6,220 @@
     <title>Registro - Consultorio Psiquiátrico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/auth.css">
 </head>
-<body class="light-mode">
-    <div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
-
-    <div class="register-container">
-        <div class="register-card">
-            <h2><i class="fas fa-user-plus"></i> Registro de Paciente</h2>
-            <div class="alert-info"><i class="fas fa-info-circle"></i> <strong>Importante:</strong> Tu usuario será tu correo electrónico.</div>
-            <form id="registroForm">
-                <input type="text" id="nombre" class="form-control" placeholder="Nombre completo" required>
-                <input type="text" id="telefono" class="form-control" placeholder="Teléfono">
-                <input type="email" id="correo" class="form-control" placeholder="Correo electrónico (será tu usuario)" required>
-                <input type="password" id="password" class="form-control" placeholder="Contraseña (mínimo 6 caracteres)" required>
-                <input type="password" id="confirmPassword" class="form-control" placeholder="Confirmar contraseña" required>
-                <button type="submit"><i class="fas fa-check-circle"></i> Registrarse</button>
-                <button type="button" class="btn-volver" onclick="window.location.href='/'"><i class="fas fa-arrow-left"></i> Volver al Login</button>
-                <div id="mensaje" class="mt-3 text-center"></div>
-            </form>
+<body class="auth-body">
+    <div id="loading" style="display:none; position:fixed; inset:0; z-index:11000; background:rgba(30,41,59,.45); backdrop-filter:blur(3px); align-items:center; justify-content:center;">
+        <div class="spinner-border text-light" style="width:3rem; height:3rem;" role="status">
+            <span class="visually-hidden">Cargando...</span>
         </div>
     </div>
+
+    <section class="auth-hero">
+        <div class="marca"><i class="fas fa-brain"></i> Consultorio Psiquiátrico</div>
+        <h1>Crea tu cuenta<br>y empieza a cuidarte</h1>
+        <p class="subtitulo">Regístrate en un minuto: tu correo será tu usuario para entrar a tu panel de bienestar.</p>
+        <ul class="auth-beneficios">
+            <li><i class="fas fa-id-badge"></i> Tu usuario será tu correo electrónico</li>
+            <li><i class="fas fa-shield-halved"></i> Tu información queda protegida en tu historial</li>
+            <li><i class="fas fa-heart-pulse"></i> Agenda tu primera consulta en cuanto entres</li>
+        </ul>
+    </section>
+
+    <section class="auth-panel">
+        <div class="auth-card">
+            <div class="titulo-form"><i class="fas fa-user-plus"></i> Registro de Paciente</div>
+            <p class="texto-muted">Llena tus datos para crear la cuenta</p>
+
+            <div class="nota-info">
+                <i class="fas fa-circle-info"></i>
+                <span><strong>Importante:</strong> tu usuario será tu correo electrónico.</span>
+            </div>
+
+            <form id="registroForm" novalidate>
+                <div class="campo" id="campoNombre">
+                    <label for="nombre">Nombre completo</label>
+                    <div class="input-grupo">
+                        <i class="fas fa-address-card izq"></i>
+                        <input type="text" id="nombre" class="form-control" placeholder="Nombre y apellidos" required>
+                    </div>
+                    <div class="hint-error">Escribe tu nombre completo</div>
+                </div>
+
+                <div class="campo" id="campoTelefono">
+                    <label for="telefono">Teléfono <small style="text-transform:none; font-weight:500;">(opcional)</small></label>
+                    <div class="input-grupo">
+                        <i class="fas fa-phone izq"></i>
+                        <input type="tel" id="telefono" class="form-control" placeholder="10 dígitos" maxlength="10" inputmode="numeric">
+                    </div>
+                    <div class="hint-error">El teléfono debe tener 10 dígitos</div>
+                </div>
+
+                <div class="campo" id="campoCorreo">
+                    <label for="correo">Correo electrónico <small style="text-transform:none; font-weight:500;">(será tu usuario)</small></label>
+                    <div class="input-grupo">
+                        <i class="fas fa-envelope izq"></i>
+                        <input type="email" id="correo" class="form-control" placeholder="tucorreo@ejemplo.com" autocomplete="username" required>
+                    </div>
+                    <div class="hint-error">Escribe un correo válido (ej. nombre@dominio.com)</div>
+                </div>
+
+                <div class="campo" id="campoPassword">
+                    <label for="password">Contraseña</label>
+                    <div class="input-grupo">
+                        <i class="fas fa-lock izq"></i>
+                        <input type="password" id="password" class="form-control" placeholder="Mínimo 6 caracteres" required>
+                        <button type="button" class="input-ojo" id="ojoPassword" tabindex="-1"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div class="fuerza" id="medidorFuerza"><span></span><span></span><span></span><span></span></div>
+                    <div class="hint-error">La contraseña debe tener al menos 6 caracteres</div>
+                </div>
+
+                <div class="campo" id="campoConfirm">
+                    <label for="confirmPassword">Confirmar contraseña</label>
+                    <div class="input-grupo">
+                        <i class="fas fa-lock izq"></i>
+                        <input type="password" id="confirmPassword" class="form-control" placeholder="Repite tu contraseña" required>
+                    </div>
+                    <div class="auth-match" id="matchPassword"></div>
+                    <div class="hint-error">Las contraseñas no coinciden</div>
+                </div>
+
+                <div id="mensaje" class="text-center mt-3"></div>
+
+                <div class="auth-botones">
+                    <button type="submit" class="auth-btn-principal" id="btnRegistro">
+                        <i class="fas fa-check-circle"></i> Registrarse
+                    </button>
+                    <button type="button" class="auth-btn-secundario" onclick="window.location.href='/'">
+                        <i class="fas fa-arrow-left"></i> Volver al Login
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/utils.js"></script>
     <script>
+        function mostrarMensaje(mensaje, tipo = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `auth-toast ${tipo}`;
+            toast.innerHTML = `<i class="fas fa-${tipo === 'success' ? 'circle-check' : 'circle-exclamation'}"></i> ${mensaje}`;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('ocultando');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function marcarCampo(idCampo, valido) {
+            const campo = document.getElementById(idCampo);
+            campo.classList.toggle('valido', valido === true);
+            campo.classList.toggle('invalido', valido === false);
+            return valido;
+        }
+
+        function esCorreoValido(correo) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo);
+        }
+
+        // Validación en vivo por campo
+        document.getElementById('nombre').addEventListener('input', function () {
+            marcarCampo('campoNombre', this.value.trim().length >= 3 ? true : (this.value.length ? false : null));
+        });
+
+        document.getElementById('telefono').addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '');
+            const n = this.value.length;
+            if (n === 0) marcarCampo('campoTelefono', null);
+            else marcarCampo('campoTelefono', n === 10);
+        });
+
+        document.getElementById('correo').addEventListener('input', function () {
+            if (this.value.length === 0) marcarCampo('campoCorreo', null);
+            else marcarCampo('campoCorreo', esCorreoValido(this.value.trim()));
+        });
+
+        // Fuerza de la contraseña
+        document.getElementById('password').addEventListener('input', function () {
+            const v = this.value;
+            const medidor = document.getElementById('medidorFuerza');
+            let nivel = 0;
+            if (v.length >= 6) nivel = 1;
+            if (v.length >= 6 && /[A-Z]/.test(v) && /[0-9]/.test(v)) nivel = 2;
+            if (v.length >= 8 && /[A-Z]/.test(v) && /[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v)) nivel = 3;
+            medidor.className = 'fuerza' + (nivel ? ' f' + (nivel + 1) : '');
+            marcarCampo('campoPassword', v.length === 0 ? null : v.length >= 6);
+            revisarCoincidencia();
+        });
+
+        // Coincidencia en vivo
+        function revisarCoincidencia() {
+            const p = document.getElementById('password').value;
+            const c = document.getElementById('confirmPassword').value;
+            const match = document.getElementById('matchPassword');
+            if (!c) { match.classList.remove('visible', 'ok', 'mal'); marcarCampo('campoConfirm', null); return; }
+            if (p === c) {
+                match.className = 'auth-match visible ok';
+                match.innerHTML = '<i class="fas fa-circle-check"></i> Las contraseñas coinciden';
+                marcarCampo('campoConfirm', true);
+            } else {
+                match.className = 'auth-match visible mal';
+                match.innerHTML = '<i class="fas fa-circle-xmark"></i> Aún no coinciden';
+                marcarCampo('campoConfirm', false);
+            }
+        }
+        document.getElementById('confirmPassword').addEventListener('input', revisarCoincidencia);
+
+        // Mostrar/ocultar contraseña
+        document.getElementById('ojoPassword').addEventListener('click', () => {
+            const input = document.getElementById('password');
+            const ojo = document.querySelector('#ojoPassword i');
+            const visible = input.type === 'text';
+            input.type = visible ? 'password' : 'text';
+            ojo.className = visible ? 'fas fa-eye' : 'fas fa-eye-slash';
+        });
+
         document.getElementById('registroForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const nombre = document.getElementById('nombre').value.trim();
+            const telefono = document.getElementById('telefono').value;
+            const correo = document.getElementById('correo').value.trim();
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
-            
+
+            let valido = true;
+            valido = marcarCampo('campoNombre', nombre.length >= 3) && valido;
+            if (telefono) valido = marcarCampo('campoTelefono', telefono.length === 10) && valido;
+            let correoValido = marcarCampo('campoCorreo', esCorreoValido(correo));
+            valido = correoValido && valido;
+            valido = marcarCampo('campoPassword', password.length >= 6) && valido;
+            valido = marcarCampo('campoConfirm', password === confirmPassword && confirmPassword.length > 0) && valido;
+            if (!valido) {
+                mostrarMensaje('Revisa los campos marcados', 'danger');
+                return;
+            }
+
             if (password !== confirmPassword) {
-                mostrarMensaje('❌ Las contraseñas no coinciden', 'danger');
+                mostrarMensaje('Las contraseñas no coinciden', 'danger');
                 return;
             }
             if (password.length < 6) {
-                mostrarMensaje('❌ La contraseña debe tener al menos 6 caracteres', 'danger');
+                mostrarMensaje('La contraseña debe tener al menos 6 caracteres', 'danger');
                 return;
             }
-            
+
             const datos = {
-                nombre: document.getElementById('nombre').value,
-                telefono: document.getElementById('telefono').value,
-                correo: document.getElementById('correo').value,
-                username: document.getElementById('correo').value,
+                nombre: nombre,
+                telefono: telefono,
+                correo: correo,
+                username: correo,
                 password: password
             };
-            
+
             setLoading(true);
+            document.getElementById('btnRegistro').disabled = true;
             try {
                 const response = await fetch('/api/public/registro', {
                     method: 'POST',
@@ -62,13 +228,15 @@
                 });
                 const resultado = await response.text();
                 if (response.ok) {
-                    mostrarMensaje('✅ Registro exitoso. Redirigiendo al login...', 'success');
+                    mostrarMensaje('Registro exitoso. Redirigiendo al login...', 'success');
                     setTimeout(() => { window.location.href = '/'; }, 2000);
                 } else {
-                    mostrarMensaje('❌ ' + resultado, 'danger');
+                    mostrarMensaje(resultado, 'danger');
+                    document.getElementById('btnRegistro').disabled = false;
                 }
             } catch (error) {
-                mostrarMensaje('❌ Error de conexión', 'danger');
+                mostrarMensaje('Error de conexión', 'danger');
+                document.getElementById('btnRegistro').disabled = false;
             }
             setLoading(false);
         });
