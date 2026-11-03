@@ -23,6 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     document.getElementById('userName').innerText = localStorage.getItem('username');
+    const avatarJefe = document.getElementById('clinAvatar');
+    if (avatarJefe) avatarJefe.innerText = (localStorage.getItem('username') || 'J').charAt(0).toUpperCase();
     cargarModoOscuro();
     
     // Obtener departamento del jefe
@@ -68,7 +70,9 @@ async function obtenerDepartamentoJefe() {
                     'ARCHIVO': 'Archivo Clínico',
                     'ADMINISTRACION': 'Administración'
                 };
-                document.getElementById('departamentoNombre').innerText = '📋 ' + (nombres[departamentoActual] || departamentoActual);
+                document.getElementById('departamentoNombre').innerText = 'Depto. ' + (nombres[departamentoActual] || departamentoActual);
+                const badgeDepto = document.getElementById('departamentoBadge');
+                if (badgeDepto) badgeDepto.innerText = nombres[departamentoActual] || departamentoActual;
             }
         }
     } catch(e) { console.error(e); }
@@ -131,6 +135,9 @@ async function cargarDashboardJefe() {
                     <td>${obtenerBadgeEstado(c.estado)}</td>
                 </tr>
             `).join('');
+            
+            // Gráficas del departamento
+            await dibujarGraficasClinicas(citasDepto);
         }
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -145,22 +152,31 @@ async function cargarEquipo() {
             const usuarios = await res.json();
             const equipo = usuarios.filter(u => u.departamento === departamentoActual && u.rol !== 'DIRECTOR');
             
+            const nombresDepto = {
+                'PSICOLOGIA': 'badge-psicologia',
+                'PSIQUIATRIA': 'badge-psiquiatria',
+                'TRABAJO_SOCIAL': 'badge-trabajo-social',
+                'ENFERMERIA': 'badge-enfermeria',
+                'ARCHIVO': 'badge-archivo',
+                'ADMINISTRACION': 'badge-administracion'
+            };
             const container = document.getElementById('equipoContainer');
             container.innerHTML = equipo.map(u => `
                 <div class="col-md-4">
                     <div class="miembro-card">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <h6><i class="fas fa-user-circle"></i> ${u.nombreCompleto || u.username}</h6>
+                        <div class="miembro-top">
+                            <div class="paciente-avatar">${(u.nombreCompleto || u.username || '?').charAt(0).toUpperCase()}</div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">${u.nombreCompleto || u.username}</h6>
                                 <span class="badge bg-info">${u.rol}</span>
-                                ${u.especialidad ? `<span class="badge bg-secondary">${u.especialidad}</span>` : ''}
+                                ${u.especialidad ? `<span class="badge bg-white text-dark border">${u.especialidad}</span>` : ''}
                             </div>
                             <div>
-                                <span class="badge-departamento ${departamentoActual === 'PSICOLOGIA' ? 'badge-psicologia' : departamentoActual === 'PSIQUIATRIA' ? 'badge-psiquiatria' : 'badge-administracion'}">${departamentoActual}</span>
+                                <span class="badge-departamento ${nombresDepto[departamentoActual] || 'badge-administracion'}">${departamentoActual}</span>
                             </div>
                         </div>
-                        <div class="mt-2 small text-muted">
-                            <i class="fas fa-envelope"></i> ${u.correo || 'Sin correo'} | 
+                        <div class="mt-2 small text-muted miembro-datos">
+                            <i class="fas fa-envelope"></i> ${u.correo || 'Sin correo'} &nbsp;·&nbsp;
                             <i class="fas fa-phone"></i> ${u.telefono || 'Sin teléfono'}
                         </div>
                     </div>

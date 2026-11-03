@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     document.getElementById('userName').innerText = localStorage.getItem('username');
+    const avatarEnf = document.getElementById('clinAvatar');
+    if (avatarEnf) avatarEnf.innerText = (localStorage.getItem('username') || 'E').charAt(0).toUpperCase();
     cargarModoOscuro();
     cargarDashboardEnfermero();
     cargarCitasEnfermero();
@@ -82,6 +84,9 @@ async function cargarDashboardEnfermero() {
                     </td>
                 </tr>
             `).join('');
+            
+            // Gráficas del panel
+            await dibujarGraficasClinicas(misCitas);
         }
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -216,11 +221,12 @@ async function cargarPacientesSignos() {
                     container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados</div>';
                 } else {
                     container.innerHTML = pacientes.map(p => `
-                        <div class="list-group-item list-group-item-action" 
-                             onclick="seleccionarPacienteSignos(${p.id}, '${p.nombre}')" 
-                             style="cursor: pointer; border-left: 4px solid #880e4f; margin-bottom: 5px;">
-                            <strong>${p.nombre}</strong><br>
-                            <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
+                        <div class="paciente-item" onclick="seleccionarPacienteSignos(${p.id}, '${p.nombre}')">
+                            <div class="paciente-avatar">${(p.nombre || 'P').charAt(0).toUpperCase()}</div>
+                            <div class="paciente-nombre">
+                                <strong>${p.nombre}</strong><br>
+                                <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
+                            </div>
                         </div>
                     `).join('');
                 }
@@ -258,14 +264,13 @@ async function cargarSignosVitales(pacienteId) {
                 container.innerHTML = '<div class="alert alert-info">No hay signos vitales registrados para este paciente.</div>';
             } else {
                 container.innerHTML = signos.slice().reverse().map(s => `
-                    <div class="signos-vitales-card">
-                        <div class="d-flex justify-content-between">
+                    <div class="nota-card nota-tipo-observacion">
+                        <div class="d-flex justify-content-between align-items-start">
                             <strong>${new Date(s.fechaCreacion).toLocaleString()}</strong>
                             <span class="badge bg-primary">${s.recomendaciones || 'Sin observaciones'}</span>
                         </div>
-                        <div class="mt-1">
-                            ${s.medicamentos || ''}
-                        </div>
+                        <div class="mt-2 nodo-grande" style="white-space: pre-line;">${s.medicamentos || ''}</div>
+                        <hr class="my-2">
                         <small class="text-muted">Registrado por: ${s.doctor?.nombreCompleto || s.doctor?.username || 'Enfermero'}</small>
                     </div>
                 `).join('');

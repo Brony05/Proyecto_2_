@@ -1,0 +1,294 @@
+/* ============================================================
+   CLÍNICO — Rediseño 2026 (psicólogo / psiquiatra / director)
+   Se carga solo en esas vistas. styles.css sigue intacto.
+   Misma paleta y patrón que doctor.css y admin.css.
+   ============================================================ */
+
+:root {
+    --clin-primario: #667eea;
+    --clin-secundario: #764ba2;
+    --clin-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --clin-fondo: #f4f6fb;
+    --clin-tinta: #2d3142;
+    --clin-muted: #6b7280;
+    --clin-card: #ffffff;
+    --clin-borde: #e8ecf4;
+    --clin-verde: #10b981;
+    --clin-amarillo: #f59e0b;
+    --clin-rojo: #ef4444;
+    --clin-cyan: #06b6d4;
+    --clin-sombra: 0 10px 30px rgba(45, 49, 66, 0.08);
+    --clin-sombra-hover: 0 18px 40px rgba(102, 126, 234, 0.18);
+    --clin-radio: 18px;
+}
+
+/* ==================== FONDO ==================== */
+body.clinico-body {
+    background:
+        radial-gradient(ellipse 60% 40% at 10% 0%, rgba(102, 126, 234, 0.12), transparent),
+        radial-gradient(ellipse 50% 45% at 95% 10%, rgba(118, 75, 162, 0.10), transparent),
+        var(--clin-fondo);
+    color: var(--clin-tinta);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+}
+
+/* ==================== NAVBAR ==================== */
+.clinico-body .navbar-custom {
+    background: var(--clin-grad);
+    padding: 14px 22px;
+    box-shadow: 0 6px 24px rgba(102, 126, 234, 0.35);
+}
+.clinico-body .nav-usuario {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50px; padding: 6px 16px 6px 8px;
+    backdrop-filter: blur(6px);
+}
+.clinico-body .nav-usuario .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9); color: var(--clin-secundario);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+}
+.clinico-body .nav-usuario .nombre {
+    color: #fff; font-weight: 600; max-width: 180px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.clinico-body .nav-usuario .rol-chip {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(255,255,255,.25); padding: 2px 8px; border-radius: 10px; color: #fff;
+}
+.clinico-body .badge-especialidad {
+    background: rgba(255,255,255,.25) !important;
+    color: #fff !important; border: 1px solid rgba(255,255,255,.35);
+    border-radius: 50px; font-weight: 600; padding: 5px 12px; font-size: 11px;
+}
+
+/* ==================== TABS PÍLDORA ==================== */
+.clinico-body .nav-tabs { gap: 8px; border-bottom: none; flex-wrap: wrap; }
+.clinico-body .nav-tabs .nav-link {
+    border: none; border-radius: 14px; padding: 11px 20px;
+    font-weight: 600; background: var(--clin-card); color: var(--clin-muted);
+    box-shadow: var(--clin-sombra); display: flex; align-items: center; gap: 8px;
+    transition: all 0.25s ease;
+}
+.clinico-body .nav-tabs .nav-link i { font-size: 15px; }
+.clinico-body .nav-tabs .nav-link:hover { transform: translateY(-2px); color: var(--clin-primario); }
+.clinico-body .nav-tabs .nav-link.active {
+    background: var(--clin-grad); color: #fff;
+    box-shadow: 0 6px 18px rgba(102, 126, 234, 0.4);
+}
+
+/* ==================== KPI / STAT CARDS ==================== */
+.stat-card {
+    border: none !important; border-radius: var(--clin-radio) !important;
+    background: var(--clin-card) !important;
+    box-shadow: var(--clin-sombra) !important;
+    padding: 22px 24px !important; margin-bottom: 14px;
+    position: relative; overflow: hidden; text-align: left !important;
+    transition: transform .22s ease, box-shadow .22s ease;
+    animation: clinAparecer .35s ease both;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: var(--clin-sombra-hover) !important; }
+.stat-card::after {
+    content: ''; position: absolute; right: -24px; bottom: -24px;
+    width: 110px; height: 110px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(102,126,234,.10), rgba(118,75,162,.10));
+}
+.stat-card i {
+    position: absolute; top: 20px; right: 20px; font-size: 20px;
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    z-index: 1; margin: 0 !important;
+}
+.stat-card i.fa-calendar-check { background: var(--clin-cyan); }
+.stat-card i.fa-calendar-week { background: var(--clin-secundario); }
+.stat-card i.fa-spin, .stat-card i.fa-heart       { background: var(--clin-rojo); }
+.stat-card i.fa-check-circle  { background: var(--clin-verde); }
+.stat-card i.fa-users         { background: var(--clin-primario); }
+.stat-card i.fa-dollar-sign   { background: var(--clin-verde); }
+.stat-card .number {
+    font-size: 38px !important; font-weight: 800 !important;
+    color: var(--clin-tinta) !important; text-align: left !important;
+    line-height: 1.1; margin: 26px 0 4px;
+}
+.stat-card .label { color: var(--clin-muted) !important; font-weight: 600; font-size: 13px; text-align: left !important; }
+
+/* ==================== TABLAS ==================== */
+.clinico-body .table-container {
+    background: var(--clin-card); border: 1px solid var(--clin-borde);
+    border-radius: var(--clin-radio); box-shadow: var(--clin-sombra);
+    padding: 22px 24px; margin-top: 0;
+}
+.clinico-body .table-container h5 {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 17px; margin-bottom: 16px;
+}
+.clinico-body .table-container h5 i { color: var(--clin-primario); }
+.clinico-body .table-container h5 .ico {
+    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px;
+}
+.ico-cal   { background: var(--clin-grad); }
+.ico-verde { background: var(--clin-verde); }
+.ico-azul  { background: var(--clin-primario); }
+.ico-rojo  { background: var(--clin-rojo); }
+.ico-amar  { background: var(--clin-amarillo); }
+.clinico-body .table { margin-bottom: 0; }
+.clinico-body .table thead th {
+    background: #f8f9ff; border: none; border-bottom: 2px solid var(--clin-borde) !important;
+    color: var(--clin-muted); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: .8px; font-weight: 700; padding: 10px 12px;
+    white-space: nowrap;
+}
+.clinico-body .table tbody td {
+    vertical-align: middle; padding: 12px; font-size: 14px;
+    border-bottom: 1px solid var(--clin-borde);
+}
+.clinico-body .table tbody tr { transition: background .15s ease; }
+.clinico-body .table tbody tr:hover { background: #f6f8ff; }
+.clinico-body .table tbody tr:last-child td { border-bottom: none; }
+
+/* ==================== FILTROS Y FORMULARIOS ==================== */
+.clinico-body .filter-section {
+    background: var(--clin-card); border: 1px solid var(--clin-borde);
+    border-radius: var(--clin-radio); box-shadow: var(--clin-sombra);
+    padding: 16px 20px; margin-bottom: 18px;
+}
+.clinico-body .form-control, .clinico-body .form-select {
+    border-radius: 12px; border: 1.5px solid var(--clin-borde);
+    padding: 9px 14px; font-size: 14px;
+}
+.clinico-body .form-control:focus, .clinico-body .form-select:focus {
+    border-color: var(--clin-primario); box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+}
+.clinico-body .btn { border-radius: 12px; font-weight: 600; }
+.clinico-body .btn-sm { border-radius: 10px; }
+.clinico-body .btn-primary, .clinico-body .btn-primary-custom {
+    background: var(--clin-grad); border: none;
+}
+.clinico-body .btn-primary:hover, .clinico-body .btn-primary-custom:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(102,126,234,.4); }
+.clinico-body .btn-primary:disabled { transform: none; box-shadow: none; opacity: .6; }
+.clinico-body .btn-success { background: var(--clin-verde); border: none; }
+.clinico-body .btn-warning { background: #fbbf24; color: #7c2d12; border: none; }
+.clinico-body .btn-backup {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1); border: none; color: #fff; font-weight: 700;
+    padding: 12px 26px; border-radius: 14px; box-shadow: 0 8px 22px rgba(14,165,233,.35);
+}
+.clinico-body .btn-backup:hover { transform: translateY(-2px); }
+
+/* ==================== GRÁFICAS ==================== */
+.clinico-body .charts-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; padding: 10px;
+}
+.grafica-panel {
+    background: var(--clin-card); border: 1px solid var(--clin-borde);
+    border-radius: var(--clin-radio); box-shadow: var(--clin-sombra);
+    padding: 20px; margin-bottom: 20px; animation: clinAparecer .35s ease both;
+}
+.grafica-panel .panel-titulo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 16px; margin-bottom: 14px; color: var(--clin-tinta);
+}
+.grafica-panel .panel-titulo .ico {
+    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px;
+}
+.grafica-panel canvas { max-height: 260px; }
+.empty-chart-note {
+    text-align: center; color: var(--clin-muted); font-size: 14px;
+    padding: 26px 12px; background: #f8f9fd; border-radius: 14px;
+}
+
+/* Director: badges de departamento */
+.badge-departamento { padding: 6px 14px; border-radius: 50px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; display: inline-block; }
+.badge-psicologia     { background: #ecfdf5; color: #059669; }
+.badge-psiquiatria    { background: #ecfeff; color: #0891b2; }
+.badge-trabajo-social { background: #fffbeb; color: #b45309; }
+.badge-enfermeria     { background: #faf5ff; color: #9333ea; }
+.badge-archivo        { background: #fef2f2; color: #dc2626; }
+.badge-administracion { background: #f1f5f9; color: #475569; }
+
+/* ==================== TARJETA DE MIEMBRO (equipo del jefe) ==================== */
+.clinico-body .miembro-card {
+    background: var(--clin-card); border: 1px solid var(--clin-borde);
+    border-radius: var(--clin-radio); box-shadow: var(--clin-sombra);
+    padding: 18px; margin-bottom: 16px;
+    transition: transform .22s ease, box-shadow .22s ease;
+    animation: clinAparecer .35s ease both;
+}
+.clinico-body .miembro-card:hover { transform: translateY(-3px); box-shadow: var(--clin-sombra-hover); }
+.clinico-body .miembro-top { display: flex; align-items: center; gap: 12px; }
+
+/* ==================== NOTAS Y MEDICAMENTOS ==================== */
+.clinico-body .paciente-item {
+    cursor: pointer; padding: 12px 16px; margin-bottom: 10px;
+    border-radius: 14px; background: var(--clin-card);
+    border: 1px solid var(--clin-borde);
+    border-left: 4px solid var(--clin-primario);
+    transition: all 0.2s; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 4px 14px rgba(45,49,66,.06);
+}
+.clinico-body .paciente-item:hover {
+    background-color: #f6f8ff; transform: translateX(4px);
+    box-shadow: 0 8px 20px rgba(102,126,234,.15);
+}
+.clinico-body .paciente-item.selected {
+    background-color: #f0f4ff; border-left: 4px solid var(--clin-verde);
+}
+.clinico-body .paciente-avatar {
+    width: 42px; height: 42px; flex: 0 0 42px; background: var(--clin-grad);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.info-paciente-seleccionado {
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
+    border-radius: 14px; padding: 10px 16px; margin-bottom: 16px;
+}
+.clinico-body .nota-card {
+    background: #f8f9fd; border-radius: 14px; padding: 15px 18px;
+    margin-bottom: 12px; border-left: 4px solid var(--clin-primario);
+    transition: transform .2s ease; animation: clinAparecer .3s ease both;
+}
+.clinico-body .nota-card:hover { transform: translateY(-2px); }
+.nota-tipo-diagnostico   { border-left-color: var(--clin-primario); }
+.nota-tipo-recomendacion { border-left-color: var(--clin-verde); }
+.nota-tipo-consejo       { border-left-color: var(--clin-cyan); }
+.nota-tipo-observacion   { border-left-color: var(--clin-amarillo); }
+.nota-tipo-evolucion     { border-left-color: var(--clin-secundario); }
+.clinico-body .medicamento-card {
+    background: #fffbeb; border-left: 4px solid var(--clin-amarillo);
+    border-radius: 14px; padding: 12px 16px; margin-bottom: 10px;
+    animation: clinAparecer .3s ease both;
+}
+.clinico-body .nodo-grande { font-size: 15px; }
+
+/* ==================== MODALES ==================== */
+.clinico-body .modal-content {
+    border-radius: var(--clin-radio); border: none;
+    box-shadow: 0 24px 70px rgba(45,49,66,.35);
+}
+.clinico-body .modal-header {
+    border-bottom: 1px solid var(--clin-borde);
+    background: var(--clin-grad); color: #fff;
+    border-radius: var(--clin-radio) var(--clin-radio) 0 0;
+}
+.clinico-body .modal-header h5 { font-weight: 800; }
+.clinico-body .modal-header .btn-close { filter: brightness(0) invert(1); }
+.clinico-body .modal-footer { border-top: 1px solid var(--clin-borde); }
+.clinico-body .cronometro-container {
+    background: var(--clin-grad); border-radius: 16px;
+    padding: 22px 20px; text-align: center; color: #fff;
+}
+
+/* ==================== ANIMACIÓN ==================== */
+@keyframes clinAparecer { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .stat-card .number { font-size: 30px !important; }
+    .clinico-body .nav-tabs .nav-link { padding: 10px 14px; font-size: 13px; }
+    .clinico-body .table { font-size: 13px; }
+    .clinico-body .charts-grid { grid-template-columns: 1fr; }
+}

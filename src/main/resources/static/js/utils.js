@@ -80,6 +80,106 @@ function formatearPrecio(precio) {
     return `$${precio.toLocaleString('es-MX')}`;
 }
 
+// ==================== GRÁFICAS DE VISTAS CLÍNICAS (PSICÓLOGO / PSIQUIATRA) ====================
+let _grafEstadosClinica = null;
+let _grafMesesClinica = null;
+
+function dibujarGraficasClinicas(citas) {
+    const canvasEstados = document.getElementById('graficaEstadosClinica');
+    const canvasMeses = document.getElementById('graficaMesesClinica');
+    if (!canvasEstados || !canvasMeses || typeof Chart === 'undefined') return;
+    if (typeof Chart.defaults.font !== 'undefined') Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+
+    citas = Array.isArray(citas) ? citas : [];
+
+    // --- Dona: citas por estado ---
+    const ordenEstados = ['AGENDADA', 'REAGENDADA', 'EN_PROGRESO', 'COMPLETADA', 'CANCELADA'];
+    const etiquetasEstados = { AGENDADA: 'Agendada', REAGENDADA: 'Reagendada', EN_PROGRESO: 'En progreso', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' };
+    const conteoEstados = ordenEstados
+        .map(e => ({ estado: e, total: citas.filter(c => c.estado === e).length }))
+        .filter(x => x.total > 0);
+    const panelEstados = canvasEstados.closest('.grafica-panel');
+    _graflimpiaPanel(panelEstados, canvasEstados);
+    if (conteoEstados.length === 0) {
+        _grafNotaVacia(panelEstados, 'Sin citas asignadas todavía', canvasEstados);
+    } else {
+        if (_grafEstadosClinica) _grafEstadosClinica.destroy();
+        const mapColor = { AGENDADA: '#818cf8', REAGENDADA: '#fcd34d', EN_PROGRESO: '#22d3ee', COMPLETADA: '#34d399', CANCELADA: '#f87171' };
+        _grafEstadosClinica = new Chart(canvasEstados.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: conteoEstados.map(x => etiquetasEstados[x.estado]),
+                datasets: [{
+                    data: conteoEstados.map(x => x.total),
+                    backgroundColor: conteoEstados.map(x => mapColor[x.estado] || '#818cf8'),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: true, cutout: '62%',
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, color: '#2d3142', font: { size: 11 } } } }
+            }
+        });
+    }
+
+    // --- Barras: citas por mes ---
+    const nombresMes = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const porMes = {};
+    citas.forEach(c => {
+        if (!c.fecha) return;
+        const mes = String(c.fecha).split('-')[1];
+        if (mes) porMes[mes] = (porMes[mes] || 0) + 1;
+    });
+    const mesesOrdenados = Object.keys(porMes).sort();
+    const panelMeses = canvasMeses.closest('.grafica-panel');
+    _graflimpiaPanel(panelMeses, canvasMeses);
+    if (mesesOrdenados.length === 0) {
+        _grafNotaVacia(panelMeses, 'Sin citas para graficar todavía', canvasMeses);
+    } else {
+        if (_grafMesesClinica) _grafMesesClinica.destroy();
+        _grafMesesClinica = new Chart(canvasMeses.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: mesesOrdenados.map(m => nombresMes[parseInt(m, 10) - 1] || m),
+                datasets: [{
+                    label: 'Citas',
+                    data: mesesOrdenados.map(m => porMes[m]),
+                    backgroundColor: 'rgba(102, 126, 234, 0.75)',
+                    hoverBackgroundColor: '#764ba2',
+                    borderRadius: 8,
+                    maxBarThickness: 42
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef1f8' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+}
+
+function _grafNotaVacia(panel, mensaje, canvas) {
+    if (panel && !panel.querySelector('.empty-chart-note')) {
+        const div = document.createElement('div');
+        div.className = 'empty-chart-note';
+        div.innerHTML = '<i class="fas fa-chart-line me-2"></i>' + (mensaje || 'Sin datos todavía');
+        panel.appendChild(div);
+    }
+    if (canvas) canvas.style.display = 'none';
+}
+
+function _graflimpiaPanel(panel, canvas) {
+    if (panel) {
+        const nota = panel.querySelector('.empty-chart-note');
+        if (nota) nota.remove();
+    }
+    canvas.style.display = '';
+}
+
 function obtenerBadgeEstado(estado) {
     const estados = {
         'AGENDADA': '<span class="badge-estado badge-agendada">Agendada</span>',
