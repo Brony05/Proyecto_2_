@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.*;
 import mx.com.ubam.isc.apijwt.model.Cita;import mx.com.ubam.isc.apijwt.model.Usuario;
 import mx.com.ubam.isc.apijwt.model.Cliente;
 import mx.com.ubam.isc.apijwt.model.Servicio;
+import mx.com.ubam.isc.apijwt.model.Asignacion;
+import mx.com.ubam.isc.apijwt.repository.AsignacionRepository;
 import mx.com.ubam.isc.apijwt.service.CitaService;
 import mx.com.ubam.isc.apijwt.service.EmailService;
 import mx.com.ubam.isc.apijwt.service.PdfExportService;
@@ -34,6 +36,9 @@ public class CitaController {
 
     @Autowired
     private CitaService citaService;
+
+    @Autowired
+    private AsignacionRepository asignacionRepository;
 
     @Autowired
     private EmailService emailService;
@@ -186,6 +191,18 @@ public class CitaController {
         return List.of();
     }
     
+    /** Departamento de un especialista, igual que Cita.getDepartamento(). */
+    private String departamentoDeDoctor(Usuario doctor) {
+        if (doctor == null || doctor.getRol() == null) return null;
+        switch (doctor.getRol()) {
+            case "PSICOLOGO": return "PSICOLOGIA";
+            case "PSIQUIATRA": return "PSIQUIATRIA";
+            case "ENFERMERO": return "ENFERMERIA";
+            case "TRABAJADOR_SOCIAL": return "TRABAJO_SOCIAL";
+            default: return doctor.getDepartamento();
+        }
+    }
+
     private String getNombreDoctor(Usuario doctor) {
         if (doctor == null) return "Asignado";
         if (doctor.getNombreCompleto() != null && !doctor.getNombreCompleto().isEmpty()) {
@@ -300,6 +317,24 @@ public class CitaController {
             }
             
             Cita nueva = citaService.crear(cita);
+            
+            // Vínculo paciente–profesional: al agendar una cita se crea la asignación
+            // activa si todavía no existe, para que el panel del especialista y la
+            // regla de notas clínicas la vean sin depender del filtrado por citas.
+            try {
+                if (!asignacionRepository.existsByUsuarioAndClienteAndActivaTrue(doctor, cliente)) {
+                    Asignacion asignacion = new Asignacion();
+                    asignacion.setCliente(cliente);
+                    asignacion.setUsuario(doctor);
+                    asignacion.setDepartamento(departamentoDeDoctor(doctor));
+                    asignacion.setFechaInicio(LocalDate.now());
+                    asignacion.setActiva(true);
+                    asignacion.setMotivo("Asignación automática por cita " + nueva.getId());
+                    asignacionRepository.save(asignacion);
+                }
+            } catch (Exception ex) {
+                System.err.println("No se pudo crear la asignación automática: " + ex.getMessage());
+            }
             
             auditoriaService.registrar(usuario.getUsername(), "CREACION",
                 "Cita agendada ID " + nueva.getId() + " - " + servicioNombre + " el " + fecha

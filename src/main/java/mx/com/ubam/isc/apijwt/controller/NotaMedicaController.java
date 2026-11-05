@@ -38,6 +38,9 @@ public class NotaMedicaController {
     
     @Autowired
     private UsuarioRepository usuarioRepository;
+    
+    @Autowired
+    private AsignacionRepository asignacionRepository;
 
     @Autowired
     private AuditoriaService auditoriaService;
@@ -65,10 +68,12 @@ public class NotaMedicaController {
             }
 
             // Asignación de pacientes: el personal clínico solo escribe notas de SUS
-            // propios pacientes (un paciente es propio si tiene cita con este doctor)
+            // propios pacientes. Es propio si tiene una asignación activa o si tiene
+            // una cita con este profesional.
             if (doctor.getRol() != null && List.of("DOCTOR", "PSICOLOGO", "PSIQUIATRA", "ENFERMERO", "TRABAJADOR_SOCIAL").contains(doctor.getRol())) {
-                boolean esPropio = citaRepository.findByDoctorId(doctor.getId()).stream()
-                        .anyMatch(c -> c.getCliente() != null && pacienteId.equals(c.getCliente().getId()));
+                boolean esPropio = asignacionRepository.existsByUsuarioIdAndClienteIdAndActivaTrue(doctor.getId(), pacienteId)
+                        || citaRepository.findByDoctorId(doctor.getId()).stream()
+                                .anyMatch(c -> c.getCliente() != null && pacienteId.equals(c.getCliente().getId()));
                 if (!esPropio) {
                     return ResponseEntity.status(403).body("Este paciente no está asignado a ti. Solo puedes registrar notas de tus propios pacientes.");
                 }

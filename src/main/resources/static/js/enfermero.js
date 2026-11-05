@@ -158,44 +158,64 @@ async function completarCitaEnfermero(id) {
 }
 
 // ==================== ENFERMERO - PACIENTES ====================
+// Los pacientes del enfermero salen de sus ASIGNACIONES activas; si el
+// edificio/cita histórica es la única fuente, cae al criterio viejo.
+async function obtenerPacientesAsignadosEnfermero() {
+    try {
+        const res = await authFetch('/api/asignaciones/mias');
+        if (res.ok) {
+            const asigs = await res.json();
+            if (Array.isArray(asigs) && asigs.length > 0) {
+                const clientes = asigs.map(a => a.cliente).filter(Boolean);
+                if (clientes.length > 0) { return clientes; }
+            }
+        }
+    } catch(e) { console.error(e); }
+    // Fallback: criterio anterior (pacientes con citas del departamento)
+    const resCitas = await authFetch('/api/citas').catch(() => null);
+    if (resCitas && resCitas.ok) {
+        const todasCitas = await resCitas.json();
+        const citasEnfermeria = todasCitas.filter(c => c.departamento === 'ENFERMERIA');
+        const pacientesIds = [...new Set(citasEnfermeria.map(c => c.cliente?.id))];
+        const resPacientes = await authFetch('/api/clientes').catch(() => null);
+        if (resPacientes && resPacientes.ok) {
+            const pacientes = await resPacientes.json();
+            return pacientes.filter(p => pacientesIds.includes(p.id));
+        }
+    }
+    return [];
+}
+
 async function cargarPacientesEnfermero() {
     setLoading(true);
     try {
-        const resCitas = await authFetch('/api/citas');
-        if (resCitas.ok) {
-            const todasCitas = await resCitas.json();
-            const citasEnfermeria = todasCitas.filter(c => c.departamento === 'ENFERMERIA');
-            const pacientesIds = [...new Set(citasEnfermeria.map(c => c.cliente?.id))];
-            
-            const resPacientes = await authFetch('/api/clientes');
-            if (resPacientes.ok) {
-                let pacientes = await resPacientes.json();
-                pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
-                
-                const termino = document.getElementById('buscarPacienteEnfermero')?.value || '';
-                if (termino.length > 1) {
-                    pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
-                }
-                
-                document.getElementById('tbodyPacientesEnfermero').innerHTML = pacientes.map(p => {
-                    const citasPaciente = citasEnfermeria.filter(c => c.cliente?.id === p.id);
-                    const ultimaCita = citasPaciente.sort((a,b) => new Date(b.fecha) - new Date(a.fecha))[0];
-                    return `
-                        <tr>
-                            <td>${p.id}</td>
-                            <td>${p.nombre}</td>
-                            <td>${p.telefono || 'N/A'}</td>
-                            <td>${p.correo || 'N/A'}</td>
-                            <td>${citasPaciente.length}</td>
-                            <td>${ultimaCita ? ultimaCita.fecha + ' ' + ultimaCita.hora : '-'}</td>
-                            <td>
-                                <button class="btn btn-sm btn-success" onclick="verSignosPaciente(${p.id}, '${p.nombre}')">Signos Vitales</button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            }
+        let pacientes = await obtenerPacientesAsignadosEnfermero();
+        
+        const termino = document.getElementById('buscarPacienteEnfermero')?.value || '';
+        if (termino.length > 1) {
+            pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
         }
+        
+        const resCitas = await authFetch('/api/citas');
+        const todasCitas = resCitas.ok ? await resCitas.json() : [];
+        
+        document.getElementById('tbodyPacientesEnfermero').innerHTML = pacientes.map(p => {
+            const citasPaciente = todasCitas.filter(c => c.cliente?.id === p.id && c.departamento === 'ENFERMERIA');
+            const ultimaCita = citasPaciente.sort((a,b) => new Date(b.fecha) - new Date(a.fecha))[0];
+            return `
+                <tr>
+                    <td>${p.id}</td>
+                    <td>${p.nombre}</td>
+                    <td>${p.telefono || 'N/A'}</td>
+                    <td>${p.correo || 'N/A'}</td>
+                    <td>${citasPaciente.length}</td>
+                    <td>${ultimaCita ? ultimaCita.fecha + ' ' + ultimaCita.hora : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="verSignosPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Signos Vitales</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     } catch(e) { console.error(e); }
     setLoading(false);
 }
@@ -204,33 +224,28 @@ async function cargarPacientesEnfermero() {
 async function cargarPacientesSignos() {
     setLoading(true);
     try {
-        const resCitas = await authFetch('/api/citas');
-        if (resCitas.ok) {
-            const todasCitas = await resCitas.json();
-            const citasEnfermeria = todasCitas.filter(c => c.departamento === 'ENFERMERIA');
-            const pacientesIds = [...new Set(citasEnfermeria.map(c => c.cliente?.id))];
-            
-            const resPacientes = await authFetch('/api/clientes');
-            if (resPacientes.ok) {
-                let pacientes = await resPacientes.json();
-                pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
-                listaPacientesEnfermero = pacientes;
-                
-                const container = document.getElementById('listaPacientesSignos');
-                if (pacientes.length === 0) {
-                    container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados</div>';
-                } else {
-                    container.innerHTML = pacientes.map(p => `
-                        <div class="paciente-item" onclick="seleccionarPacienteSignos(${p.id}, '${p.nombre}')">
-                            <div class="paciente-avatar">${(p.nombre || 'P').charAt(0).toUpperCase()}</div>
-                            <div class="paciente-nombre">
-                                <strong>${p.nombre}</strong><br>
-                                <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            }
+        let pacientes = await obtenerPacientesAsignadosEnfermero();
+        
+        const termino = document.getElementById('buscarPacienteSignos')?.value || '';
+        if (termino.length > 1) {
+            pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
+        }
+        
+        listaPacientesEnfermero = pacientes;
+        
+        const container = document.getElementById('listaPacientesSignos');
+        if (pacientes.length === 0) {
+            container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados todavía</div>';
+        } else {
+            container.innerHTML = pacientes.map(p => `
+                <div class="paciente-item" onclick="seleccionarPacienteSignos(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">
+                    <div class="paciente-avatar">${(p.nombre || 'P').charAt(0).toUpperCase()}</div>
+                    <div class="paciente-nombre">
+                        <strong>${p.nombre}</strong><br>
+                        <small class="text-muted">${p.correo || ''} | ${p.telefono || 'Sin teléfono'}</small>
+                    </div>
+                </div>
+            `).join('');
         }
     } catch(e) { console.error(e); }
     setLoading(false);

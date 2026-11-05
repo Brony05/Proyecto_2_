@@ -153,27 +153,43 @@ async function completarCitaTS(id) {
 }
 
 // ==================== TRABAJADOR SOCIAL - PACIENTES (CORREGIDO) ====================
-async function cargarPacientesTS() {
-    setLoading(true);
+// Los pacientes del trabajador social salen de sus ASIGNACIONES activas; si
+// todavía se rastrean solo por citas del departamento, cae al criterio viejo.
+async function obtenerPacientesTS() {
     try {
-        const resCitas = await authFetch('/api/citas');
-        if (!resCitas.ok) {
-            setLoading(false);
-            return;
+        const res = await authFetch('/api/asignaciones/mias');
+        if (res.ok) {
+            const asigs = await res.json();
+            if (Array.isArray(asigs)) {
+                const unicos = new Map();
+                asigs.map(a => a.cliente).filter(Boolean).forEach(c => unicos.set(c.id, c));
+                if (unicos.size > 0) return [...unicos.values()];
+            }
         }
-        
+    } catch(e) { console.error(e); }
+    // Fallback: pacientes con citas del departamento
+    const resCitas = await authFetch('/api/citas').catch(() => null);
+    if (resCitas && resCitas.ok) {
         const todasCitas = await resCitas.json();
         const citasTS = todasCitas.filter(c => c.departamento === 'TRABAJO_SOCIAL');
         const pacientesIds = [...new Set(citasTS.map(c => c.cliente?.id))];
-        
-        const resPacientes = await authFetch('/api/clientes');
-        if (!resPacientes.ok) {
-            setLoading(false);
-            return;
+        const resPacientes = await authFetch('/api/clientes').catch(() => null);
+        if (resPacientes && resPacientes.ok) {
+            const pacientes = await resPacientes.json();
+            return pacientes.filter(p => pacientesIds.includes(p.id));
         }
+    }
+    return [];
+}
+
+async function cargarPacientesTS() {
+    setLoading(true);
+    try {
+        const resCitas = await authFetch('/api/citas').catch(() => null);
+        const todasCitas = resCitas && resCitas.ok ? await resCitas.json() : [];
+        const citasTS = todasCitas.filter(c => c.departamento === 'TRABAJO_SOCIAL');
         
-        let pacientes = await resPacientes.json();
-        pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
+        let pacientes = await obtenerPacientesTS();
         
         const termino = document.getElementById('buscarPacienteTS')?.value || '';
         if (termino.length > 1) {
@@ -208,7 +224,7 @@ async function cargarPacientesTS() {
                     <td>${citasPaciente.length}</td>
                     <td><span class="badge bg-warning text-dark">${p.numIntervenciones}</span></td>
                     <td>
-                        <button class="btn btn-sm btn-primary" onclick="verIntervencionesPaciente(${p.id}, '${p.nombre}')">Intervenciones</button>
+                        <button class="btn btn-sm btn-primary" onclick="verIntervencionesPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Intervenciones</button>
                     </td>
                 </tr>
             `;
@@ -225,32 +241,21 @@ async function cargarPacientesTS() {
 async function cargarPacientesIntervencion() {
     setLoading(true);
     try {
-        const resCitas = await authFetch('/api/citas');
-        if (resCitas.ok) {
-            const todasCitas = await resCitas.json();
-            const citasTS = todasCitas.filter(c => c.departamento === 'TRABAJO_SOCIAL');
-            const pacientesIds = [...new Set(citasTS.map(c => c.cliente?.id))];
-            
-            const resPacientes = await authFetch('/api/clientes');
-            if (resPacientes.ok) {
-                let pacientes = await resPacientes.json();
-                pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
-                listaPacientesTS = pacientes;
-                
-                const container = document.getElementById('listaPacientesIntervencion');
-                if (pacientes.length === 0) {
-                    container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados</div>';
-                } else {
-                    container.innerHTML = pacientes.map(p => `
-                        <div class="list-group-item list-group-item-action" 
-                             onclick="seleccionarPacienteIntervencion(${p.id}, '${p.nombre}')" 
-                             style="cursor: pointer; border-left: 4px solid #e65100; margin-bottom: 5px;">
-                            <strong>${p.nombre}</strong><br>
-                            <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
-                        </div>
-                    `).join('');
-                }
-            }
+        const pacientes = await obtenerPacientesTS();
+        listaPacientesTS = pacientes;
+        
+        const container = document.getElementById('listaPacientesIntervencion');
+        if (pacientes.length === 0) {
+            container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados todavía</div>';
+        } else {
+            container.innerHTML = pacientes.map(p => `
+                <div class="list-group-item list-group-item-action" 
+                     onclick="seleccionarPacienteIntervencion(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')" 
+                     style="cursor: pointer; border-left: 4px solid #e65100; margin-bottom: 5px;">
+                    <strong>${p.nombre}</strong><br>
+                    <small class="text-muted">${p.correo || ''} | ${p.telefono || 'Sin teléfono'}</small>
+                </div>
+            `).join('');
         }
     } catch(e) { console.error(e); }
     setLoading(false);

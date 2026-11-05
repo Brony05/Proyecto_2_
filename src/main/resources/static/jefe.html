@@ -36,6 +36,7 @@
         <li class="nav-item"><button class="nav-link active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button></li>
         <li class="nav-item"><button class="nav-link" data-tab="equipo"><i class="fas fa-users"></i> Mi Equipo</button></li>
         <li class="nav-item"><button class="nav-link" data-tab="citas"><i class="fas fa-calendar-check"></i> Citas</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="asignaciones"><i class="fas fa-link"></i> Asignaciones</button></li>
         <li class="nav-item"><button class="nav-link" data-tab="pacientes"><i class="fas fa-user-injured"></i> Pacientes</button></li>
     </ul>
 
@@ -152,6 +153,46 @@
                     <thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th>Profesional</th><th>Estado</th><th>Acciones</th></tr></thead>
                     <tbody id="tbodyCitasJefe"></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ASIGNACIONES -->
+    <div id="asignaciones" class="tab-content" style="display:none;">
+        <div class="row">
+            <div class="col-md-5">
+                <div class="table-container">
+                    <h5><div class="ico ico-cal"><i class="fas fa-link"></i></div> Nueva Asignación</h5>
+                    <div class="mb-3">
+                        <label class="form-label">Profesional de mi equipo *</label>
+                        <select id="asigProfesional" class="form-select">
+                            <option value="">Seleccionar profesional</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Buscar paciente</label>
+                        <input type="text" id="asigBuscarPaciente" class="form-control" placeholder="Escribe el nombre del paciente...">
+                    </div>
+                    <div id="asigListadoPacientes" style="max-height: 300px; overflow-y: auto; margin-bottom: 14px;"></div>
+                    <div class="mb-3">
+                        <label class="form-label">Motivo</label>
+                        <input type="text" id="asigMotivo" class="form-control" placeholder="Ej: Seguimiento de caso, control de signos...">
+                    </div>
+                    <button class="btn btn-primary w-100" id="btnAsignarPaciente" disabled onclick="crearAsignacion()">
+                        <i class="fas fa-link"></i> Asignar paciente
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="table-container">
+                    <h5><div class="ico ico-azul"><i class="fas fa-users"></i></div> Asignaciones Activas del Equipo</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead><tr><th>Paciente</th><th>Profesional</th><th>Motivo</th><th>Desde</th><th>Acciones</th></tr></thead>
+                            <tbody id="tbodyAsignacionesEquipo"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

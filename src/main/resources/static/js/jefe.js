@@ -1,6 +1,8 @@
 // ==================== JEFE - VARIABLES GLOBALES ====================
 let departamentoActual = '';
 let miEquipo = [];
+let asigProfesionalSeleccionado = null;
+let asigPacienteSeleccionado = null;
 
 // ==================== JEFE - INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
@@ -41,10 +43,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (tab === 'dashboard') cargarDashboardJefe();
             if (tab === 'equipo') cargarEquipo();
+            if (tab === 'asignaciones') iniciarTabAsignaciones();
             if (tab === 'citas') cargarCitasJefe();
             if (tab === 'pacientes') cargarPacientesJefe();
         });
     });
+    
+    // Eventos de asignaciones
+    document.getElementById('asigProfesional')?.addEventListener('change', seleccionarProfesionalAsig);
+    document.getElementById('asigBuscarPaciente')?.addEventListener('input', cargarListadoPacientesAsig);
     
     // Eventos de filtros
     document.getElementById('filtroFechaJefe')?.addEventListener('change', cargarCitasJefe);
@@ -241,6 +248,146 @@ async function cancelarCitaJefe(id) {
         }
         setLoading(false);
     }
+}
+
+// ==================== JEFE - ASIGNACIONES ====================
+async function iniciarTabAsignaciones() {
+    await cargarProfesionalesAsig();
+    await cargarListadoPacientesAsig();
+    await cargarAsignacionesEquipo();
+}
+
+async function cargarProfesionalesAsig() {
+    try {
+        const res = await authFetch('/api/usuarios');
+        if (!res.ok) return;
+        const usuarios = await res.json();
+        // Mi equipo: mismo departamento, rol clínico (no el director, ni jefes)
+        const equipo = usuarios.filter(u => u.departamento === departamentoActual
+            && ['DOCTOR', 'PSICOLOGO', 'PSIQUIATRA', 'ENFERMERO', 'TRABAJADOR_SOCIAL'].includes(u.rol));
+        miEquipo = equipo;
+        const select = document.getElementById('asigProfesional');
+        select.innerHTML = '<option value="">Seleccionar profesional</option>' +
+            equipo.map(u => `<option value="${u.id}">${u.nombreCompleto || u.username} (${u.especialidad || u.rol})</option>`).join('');
+    } catch(e) { console.error(e); }
+}
+
+function seleccionarProfesionalAsig() {
+    const valor = document.getElementById('asigProfesional').value;
+    asigProfesionalSeleccionado = valor ? parseInt(valor, 10) : null;
+    actualizarBotonAsig();
+}
+
+async function cargarListadoPacientesAsig() {
+    try {
+        const termino = document.getElementById('asigBuscarPaciente')?.value || '';
+        let url = '/api/clientes';
+        if (termino.length > 1) url += `/buscar?nombre=${encodeURIComponent(termino)}`;
+        const res = await authFetch(url);
+        if (!res.ok) return;
+        const pacientes = (await res.json()).slice(0, 40);
+        const container = document.getElementById('asigListadoPacientes');
+        container.innerHTML = pacientes.map(p => `
+            <div class="paciente-item ${asigPacienteSeleccionado === p.id ? 'selected' : ''}"
+                 onclick="seleccionarPacienteAsig(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}', this)">
+                <div class="paciente-avatar">${(p.nombre || 'P').charAt(0).toUpperCase()}</div>
+                <div class="paciente-nombre">
+                    <strong>${p.nombre}</strong><br>
+                    <small class="text-muted">${p.correo || ''}</small>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+function seleccionarPacienteAsig(id, nombre, el) {
+    asigPacienteSeleccionado = id;
+    document.getElementById('btnAsignarPaciente').dataset.nombrePaciente = nombre;
+    document.querySelectorAll('#asigListadoPacientes .paciente-item').forEach(item => item.classList.remove('selected'));
+    if (el) el.classList.add('selected');
+    actualizarBotonAsig();
+}
+
+function actualizarBotonAsig() {
+    const btn = document.getElementById('btnAsignarPaciente');
+    btn.disabled = !(asigProfesionalSeleccionado && asigPacienteSeleccionado);
+}
+
+async function crearAsignacion() {
+    if (!asigProfesionalSeleccionado || !asigPacienteSeleccionado) return;
+    setLoading(true);
+    try {
+        const res = await authFetch('/api/asignaciones', {
+            method: 'POST',
+            body: JSON.stringify({
+                clienteId: asigPacienteSeleccionado,
+                usuarioId: asigProfesionalSeleccionado,
+                motivo: document.getElementById('asigMotivo').value || 'Asignación por jefatura'
+            })
+        });
+        if (res.ok) {
+            mostrarMensaje('✅ Paciente asignado correctamente');
+            seleccionarProfesionalAsig();
+            asigPacienteSeleccionado = null;
+            document.getElementById('asigMotivo').value = '';
+            actualizarBotonAsig();
+            await cargarListadoPacientesAsig();
+            await cargarAsignacionesEquipo();
+        } else {
+            const texto = await res.text();
+            mostrarMensaje('❌ ' + (texto.slice(0, 140) || 'Error al asignar'), 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
+}
+
+async function cargarAsignacionesEquipo() {
+    try {
+        const res = await authFetch('/api/usuarios');
+        if (!res.ok) return;
+        const usuarios = await res.json();
+        const equipo = usuarios.filter(u => u.departamento === departamentoActual
+            && ['DOCTOR', 'PSICOLOGO', 'PSIQUIATRA', 'ENFERMERO', 'TRABAJADOR_SOCIAL'].includes(u.rol));
+        
+        const filas = [];
+        for (const miembro of equipo) {
+            const resAsig = await authFetch(`/api/asignaciones/persona/${miembro.id}`);
+            if (!resAsig.ok) continue;
+            const asigs = await resAsig.json();
+            asigs.forEach(a => filas.push({ asig: a, miembro }));
+        }
+        
+        document.getElementById('tbodyAsignacionesEquipo').innerHTML = filas.length === 0
+            ? '<tr><td colspan="5" class="text-center text-muted">Sin asignaciones activas todavía</td></tr>'
+            : filas.map(({asig, miembro}) => `
+                <tr>
+                    <td><strong>${asig.cliente?.nombre || asig.clienteId || 'N/A'}</strong></td>
+                    <td>${miembro.nombreCompleto || miembro.username}</td>
+                    <td>${asig.motivo || '-'}</td>
+                    <td>${asig.fechaInicio || '-'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="liberarAsignacion(${asig.id})"><i class="fas fa-unlink"></i> Liberar</button></td>
+                </tr>
+            `).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function liberarAsignacion(id) {
+    if (!confirm('¿Liberar esta asignación? El profesional dejará de ver al paciente.')) return;
+    setLoading(true);
+    try {
+        const res = await authFetch(`/api/asignaciones/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            mostrarMensaje('✅ Asignación liberada');
+            await cargarAsignacionesEquipo();
+        } else {
+            mostrarMensaje('Error al liberar', 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
 }
 
 // ==================== JEFE - PACIENTES ====================

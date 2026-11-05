@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     document.getElementById('userName').innerText = localStorage.getItem('username');
+    const avatarClin = document.getElementById('clinAvatar');
+    if (avatarClin) avatarClin.innerText = (localStorage.getItem('username') || 'P').charAt(0).toUpperCase();
     document.getElementById('especialidadBadge').innerText = localStorage.getItem('especialidad') || 'Psiquiatra';
     cargarModoOscuro();
     cargarDashboardPsiquiatra();
@@ -81,6 +83,9 @@ async function cargarDashboardPsiquiatra() {
                         <td><button class="btn btn-sm btn-success" onclick="iniciarCitaPsiquiatra(${c.id})">Iniciar</button></td>
                     </tr>
                 `).join('');
+                
+                // Gráficas del panel una vez que ya tenemos misCitas
+                await dibujarGraficasClinicas(misCitas);
             }
         }
     } catch(e) { console.error(e); }
@@ -175,63 +180,92 @@ async function cancelarCitaPsiquiatra(id) {
 }
 
 // ==================== PSIQUIATRA - PACIENTES ====================
+// ==================== PSIQUIATRA - PACIENTES ====================
+// Pacientes del psiquiatra: primero asignaciones activas, luego criterio de citas.
+async function obtenerPacientesPsiquiatra() {
+    const username = localStorage.getItem('username');
+    try {
+        const res = await authFetch('/api/asignaciones/mias');
+        if (res.ok) {
+            const asigs = await res.json();
+            if (Array.isArray(asigs)) {
+                const unicos = new Map();
+                asigs.map(a => a.cliente).filter(Boolean).forEach(c => unicos.set(c.id, c));
+                if (unicos.size > 0) return [...unicos.values()];
+            }
+        }
+    } catch(e) { console.error(e); }
+    // Fallback: pacientes con citas propias
+    const resUsuarios = await authFetch('/api/usuarios').catch(() => null);
+    let yo = null;
+    if (resUsuarios && resUsuarios.ok) {
+        const usuarios = await resUsuarios.json();
+        yo = usuarios.find(u => u.username === username);
+    }
+    const resCitas = await authFetch('/api/citas').catch(() => null);
+    if (resCitas && resCitas.ok) {
+        const todasCitas = await resCitas.json();
+        const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
+        const pacientesIds = [...new Set(misCitas.map(c => c.cliente?.id))];
+        const resPacientes = await authFetch('/api/clientes').catch(() => null);
+        if (resPacientes && resPacientes.ok) {
+            const pacientes = await resPacientes.json();
+            return pacientes.filter(p => pacientesIds.includes(p.id));
+        }
+    }
+    return [];
+}
+
 async function cargarPacientesPsiquiatra() {
     setLoading(true);
     try {
         const username = localStorage.getItem('username');
         const resUsuarios = await authFetch('/api/usuarios');
+        let yo = null;
         if (resUsuarios.ok) {
             const usuarios = await resUsuarios.json();
-            const yo = usuarios.find(u => u.username === username);
-            
-            const resCitas = await authFetch('/api/citas');
-            if (resCitas.ok) {
-                const todasCitas = await resCitas.json();
-                const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-                const pacientesIds = [...new Set(misCitas.map(c => c.cliente?.id))];
-                
-                const resPacientes = await authFetch('/api/clientes');
-                if (resPacientes.ok) {
-                    let pacientes = await resPacientes.json();
-                    pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
-                    
-                    const termino = document.getElementById('buscarPacientePsiquiatra')?.value || '';
-                    if (termino.length > 1) {
-                        pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
-                    }
-                    
-                    // Obtener medicamentos para cada paciente
-                    const medicamentosPorPaciente = {};
-                    for (const p of pacientes) {
-                        const resMed = await authFetch(`/api/medicamentos/paciente/${p.id}`).catch(() => null);
-                        if (resMed && resMed.ok) {
-                            const meds = await resMed.json();
-                            medicamentosPorPaciente[p.id] = meds.length;
-                        }
-                    }
-                    
-                    document.getElementById('tbodyPacientesPsiquiatra').innerHTML = pacientes.map(p => {
-                        const citasPaciente = misCitas.filter(c => c.cliente?.id === p.id);
-                        const ultimaCita = citasPaciente.sort((a,b) => new Date(b.fecha) - new Date(a.fecha))[0];
-                        return `
-                            <tr>
-                                <td>${p.id}</td>
-                                <td>${p.nombre}</td>
-                                <td>${p.telefono || 'N/A'}</td>
-                                <td>${p.correo || 'N/A'}</td>
-                                <td>${citasPaciente.length}</td>
-                                <td>${ultimaCita ? ultimaCita.fecha + ' ' + ultimaCita.hora : '-'}</td>
-                                <td><span class="badge bg-info">${medicamentosPorPaciente[p.id] || 0}</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="verMedicamentosPaciente(${p.id}, '${p.nombre}')">Medicamentos</button>
-                                    <button class="btn btn-sm btn-info" onclick="verNotasPacientePsiquiatra(${p.id}, '${p.nombre}')">Notas</button>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('');
-                }
+            yo = usuarios.find(u => u.username === username);
+        }
+        
+        let pacientes = await obtenerPacientesPsiquiatra();
+        
+        const resCitas = await authFetch('/api/citas');
+        const misCitas = resCitas.ok ? (await resCitas.json()).filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id) : [];
+        
+        const termino = document.getElementById('buscarPacientePsiquiatra')?.value || '';
+        if (termino.length > 1) {
+            pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
+        }
+        
+        // Obtener medicamentos para cada paciente
+        const medicamentosPorPaciente = {};
+        for (const p of pacientes) {
+            const resMed = await authFetch(`/api/medicamentos/paciente/${p.id}`).catch(() => null);
+            if (resMed && resMed.ok) {
+                const meds = await resMed.json();
+                medicamentosPorPaciente[p.id] = meds.length;
             }
         }
+        
+        document.getElementById('tbodyPacientesPsiquiatra').innerHTML = pacientes.map(p => {
+            const citasPaciente = misCitas.filter(c => c.cliente?.id === p.id);
+            const ultimaCita = citasPaciente.sort((a,b) => new Date(b.fecha) - new Date(a.fecha))[0];
+            return `
+                <tr>
+                    <td>${p.id}</td>
+                    <td>${p.nombre}</td>
+                    <td>${p.telefono || 'N/A'}</td>
+                    <td>${p.correo || 'N/A'}</td>
+                    <td>${citasPaciente.length}</td>
+                    <td>${ultimaCita ? ultimaCita.fecha + ' ' + ultimaCita.hora : '-'}</td>
+                    <td><span class="badge bg-info">${medicamentosPorPaciente[p.id] || 0}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="verMedicamentosPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Medicamentos</button>
+                        <button class="btn btn-sm btn-info" onclick="verNotasPacientePsiquiatra(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Notas</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     } catch(e) { console.error(e); }
     setLoading(false);
 }
@@ -240,39 +274,28 @@ async function cargarPacientesPsiquiatra() {
 async function cargarPacientesMedicamento() {
     setLoading(true);
     try {
-        const username = localStorage.getItem('username');
-        const resUsuarios = await authFetch('/api/usuarios');
-        if (resUsuarios.ok) {
-            const usuarios = await resUsuarios.json();
-            const yo = usuarios.find(u => u.username === username);
-            
-            const resCitas = await authFetch('/api/citas');
-            if (resCitas.ok) {
-                const todasCitas = await resCitas.json();
-                const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-                const pacientesIds = [...new Set(misCitas.map(c => c.cliente?.id))];
-                
-                const resPacientes = await authFetch('/api/clientes');
-                if (resPacientes.ok) {
-                    let pacientes = await resPacientes.json();
-                    pacientes = pacientes.filter(p => pacientesIds.includes(p.id));
-                    listaPacientesPsiquiatra = pacientes;
-                    
-                    const container = document.getElementById('listaPacientesMedicamento');
-                    if (pacientes.length === 0) {
-                        container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados</div>';
-                    } else {
-                        container.innerHTML = pacientes.map(p => `
-                            <div class="list-group-item list-group-item-action" 
-                                 onclick="seleccionarPacienteMedicamento(${p.id}, '${p.nombre}')" 
-                                 style="cursor: pointer; border-left: 4px solid #0d47a1; margin-bottom: 5px;">
-                                <strong>${p.nombre}</strong><br>
-                                <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
-                            </div>
-                        `).join('');
-                    }
-                }
-            }
+        let pacientes = await obtenerPacientesPsiquiatra();
+        
+        const termino = document.getElementById('buscarPacienteMedicamento')?.value || '';
+        if (termino.length > 1) {
+            pacientes = pacientes.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
+        }
+        
+        listaPacientesPsiquiatra = pacientes;
+        
+        const container = document.getElementById('listaPacientesMedicamento');
+        if (pacientes.length === 0) {
+            container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados todavía</div>';
+        } else {
+            container.innerHTML = pacientes.map(p => `
+                <div class="paciente-item" onclick="seleccionarPacienteMedicamento(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">
+                    <div class="paciente-avatar">${(p.nombre || 'P').charAt(0).toUpperCase()}</div>
+                    <div class="paciente-nombre">
+                        <strong>${p.nombre}</strong><br>
+                        <small class="text-muted">${p.correo || ''} | ${p.telefono || 'Sin teléfono'}</small>
+                    </div>
+                </div>
+            `).join('');
         }
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -397,11 +420,12 @@ async function cargarPacientesNotaPsiquiatra() {
                         container.innerHTML = '<div class="alert alert-warning">No tienes pacientes asignados</div>';
                     } else {
                         container.innerHTML = pacientes.map(p => `
-                            <div class="list-group-item list-group-item-action" 
-                                 onclick="seleccionarPacienteNotaPsiquiatra(${p.id}, '${p.nombre}')" 
-                                 style="cursor: pointer; border-left: 4px solid #0d47a1; margin-bottom: 5px;">
-                                <strong>${p.nombre}</strong><br>
-                                <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
+                            <div class="paciente-item" onclick="seleccionarPacienteNotaPsiquiatra(${p.id}, '${p.nombre}')">
+                                <div class="paciente-avatar">${(p.nombre || 'P').charAt(0).toUpperCase()}</div>
+                                <div class="paciente-nombre">
+                                    <strong>${p.nombre}</strong><br>
+                                    <small class="text-muted">${p.correo} | ${p.telefono || 'Sin teléfono'}</small>
+                                </div>
                             </div>
                         `).join('');
                     }
