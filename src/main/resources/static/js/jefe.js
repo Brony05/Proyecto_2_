@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tab === 'dashboard') cargarDashboardJefe();
             if (tab === 'equipo') cargarEquipo();
             if (tab === 'asignaciones') iniciarTabAsignaciones();
+            if (tab === 'derivaciones') cargarDerivacionesEquipo();
             if (tab === 'citas') cargarCitasJefe();
             if (tab === 'pacientes') cargarPacientesJefe();
         });
@@ -383,6 +384,153 @@ async function liberarAsignacion(id) {
             await cargarAsignacionesEquipo();
         } else {
             mostrarMensaje('Error al liberar', 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
+}
+
+// ==================== JEFE - DERIVACIONES ====================
+let derivacionesCache = [];
+
+const NOMBRES_DEPTO = {
+    PSICOLOGIA: 'Psicología', PSIQUIATRIA: 'Psiquiatría',
+    ENFERMERIA: 'Enfermería', TRABAJO_SOCIAL: 'Trabajo Social'
+};
+
+function etiquetaDepto(departamento) {
+    return NOMBRES_DEPTO[departamento] || departamento || '-';
+}
+
+function badgeEstadoDerivacion(estado) {
+    if (estado === 'APROBADA') return '<span class="badge bg-success">Aprobada</span>';
+    if (estado === 'RECHAZADA') return '<span class="badge bg-danger">Rechazada</span>';
+    return '<span class="badge bg-warning text-dark">Pendiente</span>';
+}
+
+async function cargarDerivacionesEquipo() {
+    try {
+        const res = await authFetch('/api/derivaciones/equipo');
+        const cuerpo = document.getElementById('tbodyDerivaciones');
+        if (!cuerpo) return;
+        if (!res.ok) {
+            cuerpo.innerHTML = '<tr><td colspan="7" class="text-center text-danger">No se pudieron cargar las derivaciones</td></tr>';
+            return;
+        }
+        derivacionesCache = await res.json();
+        if (!derivacionesCache.length) {
+            cuerpo.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin derivaciones para tu departamento</td></tr>';
+            return;
+        }
+        cuerpo.innerHTML = derivacionesCache.map(d => `
+            <tr>
+                <td><strong>${d.cliente?.nombre || 'N/A'}</strong></td>
+                <td><span class="badge bg-secondary">${etiquetaDepto(d.departamentoOrigen)}</span></td>
+                <td>${d.usuarioSolicita?.nombreCompleto || d.usuarioSolicita?.username || '-'}</td>
+                <td>${d.motivo || '-'}</td>
+                <td>${(d.fechaSolicitud || '').slice(0, 10)}</td>
+                <td>${badgeEstadoDerivacion(d.estado)}</td>
+                <td>${d.estado === 'PENDIENTE'
+                    ? `<button class="btn btn-sm btn-success" onclick="abrirAprobarDerivacion(${d.id})"><i class="fas fa-check"></i> Aprobar</button>
+                       <button class="btn btn-sm btn-danger" onclick="rechazarDerivacion(${d.id})"><i class="fas fa-times"></i> Rechazar</button>`
+                    : `<small class="text-muted">${d.comentarioResolucion || ''}</small>`}</td>
+            </tr>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function abrirAprobarDerivacion(id) {
+    const d = derivacionesCache.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById('derivId').value = id;
+    document.getElementById('derivPaciente').textContent = d.cliente?.nombre || '';
+    document.getElementById('derivOrigen').textContent = 'Solicitada por '
+        + (d.usuarioSolicita?.nombreCompleto || d.usuarioSolicita?.username || '')
+        + ' desde ' + etiquetaDepto(d.departamentoOrigen);
+    document.getElementById('derivComentario').value = '';
+    document.getElementById('derivLiberarOrigen').checked = true;
+
+    // Profesionales del departamento destino
+    let equipo = [];
+    try {
+        const res = await authFetch('/api/usuarios');
+        if (res.ok) {
+            const usuarios = await res.json();
+            equipo = usuarios.filter(u => u.departamento === d.departamentoDestino
+                && ['DOCTOR', 'PSICOLOGO', 'PSIQUIATRA', 'ENFERMERO', 'TRABAJADOR_SOCIAL'].includes(u.rol));
+        }
+    } catch(e) { console.error(e); }
+    document.getElementById('derivProfesional').innerHTML =
+        '<option value="">Seleccionar profesional</option>' +
+        equipo.map(u => `<option value="${u.id}">${u.nombreCompleto || u.username} (${u.especialidad || u.rol})</option>`).join('');
+
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    document.getElementById('derivFecha').value = manana.toISOString().slice(0, 10);
+    document.getElementById('derivHora').value = '10:00';
+
+    new bootstrap.Modal(document.getElementById('modalAprobarDerivacion')).show();
+}
+
+async function confirmarAprobarDerivacion() {
+    const id = parseInt(document.getElementById('derivId').value, 10);
+    const usuarioId = parseInt(document.getElementById('derivProfesional').value, 10);
+    if (!usuarioId) {
+        mostrarMensaje('Selecciona al profesional de destino', 'danger');
+        return;
+    }
+    setLoading(true);
+    try {
+        const fecha = document.getElementById('derivFecha').value;
+        const hora = document.getElementById('derivHora').value;
+        const res = await authFetch(`/api/derivaciones/${id}/aprobar`, {
+            method: 'POST',
+            body: JSON.stringify({
+                usuarioId,
+                fecha: fecha || null,
+                hora: hora || null,
+                liberarOrigen: document.getElementById('derivLiberarOrigen').checked,
+                comentario: document.getElementById('derivComentario').value
+            })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalAprobarDerivacion'))?.hide();
+            if (data?.advertencia) {
+                mostrarMensaje('⚠️ ' + data.advertencia, 'danger');
+            } else {
+                mostrarMensaje(fecha && hora
+                    ? '✅ Derivación aprobada: asignación y cita creadas'
+                    : '✅ Derivación aprobada: paciente asignado');
+            }
+            await cargarDerivacionesEquipo();
+            await cargarAsignacionesEquipo();
+        } else {
+            const texto = typeof data === 'string' ? data : 'Error al aprobar la derivación';
+            mostrarMensaje('❌ ' + texto.slice(0, 160), 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
+}
+
+async function rechazarDerivacion(id) {
+    const comentario = prompt('Motivo del rechazo (opcional):');
+    if (comentario === null) return;
+    setLoading(true);
+    try {
+        const res = await authFetch(`/api/derivaciones/${id}/rechazar`, {
+            method: 'POST',
+            body: JSON.stringify({ comentario })
+        });
+        if (res.ok) {
+            mostrarMensaje('Derivación rechazada');
+            await cargarDerivacionesEquipo();
+        } else {
+            const texto = await res.text();
+            mostrarMensaje('❌ ' + texto.slice(0, 160), 'danger');
         }
     } catch(e) {
         mostrarMensaje('Error de conexión', 'danger');

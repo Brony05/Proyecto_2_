@@ -186,6 +186,14 @@ async function obtenerPacientesAsignadosEnfermero() {
     return [];
 }
 
+// Carga el módulo compartido de derivaciones (botón "Derivar" de la tabla)
+(function cargarModuloDerivaciones() {
+    if (document.querySelector('script[src="/js/derivaciones.js"]')) return;
+    const s = document.createElement('script');
+    s.src = '/js/derivaciones.js';
+    document.head.appendChild(s);
+})();
+
 async function cargarPacientesEnfermero() {
     setLoading(true);
     try {
@@ -211,6 +219,7 @@ async function cargarPacientesEnfermero() {
                     <td>${citasPaciente.length}</td>
                     <td>${ultimaCita ? ultimaCita.fecha + ' ' + ultimaCita.hora : '-'}</td>
                     <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalDerivar(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')"><i class="fas fa-share"></i> Derivar</button>
                         <button class="btn btn-sm btn-success" onclick="verSignosPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Signos Vitales</button>
                     </td>
                 </tr>

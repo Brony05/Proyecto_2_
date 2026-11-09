@@ -216,6 +216,14 @@ async function obtenerPacientesPsiquiatra() {
     return [];
 }
 
+// Carga el módulo compartido de derivaciones (botón "Derivar" de la tabla)
+(function cargarModuloDerivaciones() {
+    if (document.querySelector('script[src="/js/derivaciones.js"]')) return;
+    const s = document.createElement('script');
+    s.src = '/js/derivaciones.js';
+    document.head.appendChild(s);
+})();
+
 async function cargarPacientesPsiquiatra() {
     setLoading(true);
     try {
@@ -260,6 +268,7 @@ async function cargarPacientesPsiquiatra() {
                     <td>${ultimaCita ? ultimaCita.fecha + ' ' + ultimaCita.hora : '-'}</td>
                     <td><span class="badge bg-info">${medicamentosPorPaciente[p.id] || 0}</span></td>
                     <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalDerivar(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')"><i class="fas fa-share"></i> Derivar</button>
                         <button class="btn btn-sm btn-primary" onclick="verMedicamentosPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Medicamentos</button>
                         <button class="btn btn-sm btn-info" onclick="verNotasPacientePsiquiatra(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Notas</button>
                     </td>

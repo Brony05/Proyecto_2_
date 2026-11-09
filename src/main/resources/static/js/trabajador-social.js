@@ -152,6 +152,14 @@ async function completarCitaTS(id) {
     }
 }
 
+// Carga el módulo compartido de derivaciones (botón "Derivar" de la tabla)
+(function cargarModuloDerivaciones() {
+    if (document.querySelector('script[src="/js/derivaciones.js"]')) return;
+    const s = document.createElement('script');
+    s.src = '/js/derivaciones.js';
+    document.head.appendChild(s);
+})();
+
 // ==================== TRABAJADOR SOCIAL - PACIENTES (CORREGIDO) ====================
 // Los pacientes del trabajador social salen de sus ASIGNACIONES activas; si
 // todavía se rastrean solo por citas del departamento, cae al criterio viejo.
@@ -224,6 +232,7 @@ async function cargarPacientesTS() {
                     <td>${citasPaciente.length}</td>
                     <td><span class="badge bg-warning text-dark">${p.numIntervenciones}</span></td>
                     <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalDerivar(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')"><i class="fas fa-share"></i> Derivar</button>
                         <button class="btn btn-sm btn-primary" onclick="verIntervencionesPaciente(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')">Intervenciones</button>
                     </td>
                 </tr>
