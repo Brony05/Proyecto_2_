@@ -35,6 +35,9 @@ build/
 ### Datos locales del consultorio (no versionar) ###
 # Respaldos de la base: contienen datos clínicos de pacientes
 backups/
+
+# Historial de Git generado para la pizarra Scrum (se regenera con el hook)
+docs/historial-git.js
 *.sql
 
 ### Secretos ###

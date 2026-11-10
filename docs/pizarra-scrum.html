@@ -56,6 +56,11 @@
   .modo-on{outline:3px solid var(--brand-soft); outline-offset:2px}
   .ayuda{font-size:12.3px; color:var(--muted); margin:-4px 0 14px; display:none}
   .ayuda.visible{display:block}
+  .sync{display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12.5px; color:var(--muted); margin:-4px 0 14px}
+  .sync b{color:var(--ink)}
+  .sync code{font-size:11.5px}
+  .sync .pill{background:var(--brand-soft); color:var(--brand); border-radius:999px; padding:3px 10px; font-weight:600}
+  .sync .pill.aviso{background:#fdf2e3; color:var(--p1)}
   [contenteditable="true"]{outline:none}
   [contenteditable="true"]:focus{background:#fffdf2; box-shadow:inset 0 0 0 2px #f0e2a8; border-radius:5px}
 
@@ -127,6 +132,7 @@
   .tag.calidad{background:#f0f9ff; color:#0369a1}
   .tag.datos{background:#f7fee7; color:#4d7c0f}
   .tag.general{background:#f1f5f9; color:#475569}
+  .tag.commit{background:#ecfeff; color:#0e7490}
   .meta{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--muted); border-top:1px dashed var(--line); padding-top:8px}
   .prio{font-weight:700; font-size:11px; letter-spacing:.04em}
   .prio.p0{color:var(--p0)} .prio.p1{color:var(--p1)} .prio.p2{color:var(--p2)}
@@ -199,6 +205,8 @@
     automáticamente en este navegador; usa <b>Descargar JSON</b> para llevarte una copia o pasármela.
   </p>
 
+  <div class="sync" id="sync"></div>
+
   <section class="progress-box">
     <div class="progress-head">
       <strong>Avance del sprint</strong>
@@ -215,6 +223,7 @@
       <span><i class="dot" style="background:var(--doing)"></i> En curso</span>
       <span><i class="dot" style="background:var(--todo)"></i> Backlog</span>
       <span><i class="dot" style="background:var(--brand)"></i> Tarjeta propia (añadida por ti)</span>
+      <span><i class="dot" style="background:#0e7490"></i> Commit del historial (automática)</span>
     </div>
   </section>
 
@@ -256,6 +265,7 @@
   </footer>
 </div>
 
+<script src="historial-git.js"></script>
 <script>
 (function(){
   'use strict';
@@ -267,7 +277,7 @@
     { estado:'revision', titulo:'En revisión' },
     { estado:'hecho',    titulo:'Hecho' }
   ];
-  const EPICAS = ['permisos','derivaciones','asignaciones','seguridad','frontend','calidad','datos','general'];
+  const EPICAS = ['permisos','derivaciones','asignaciones','seguridad','frontend','calidad','datos','commit','general'];
   const PRIOS = ['p0','p1','p2'];
 
   const INICIAL = {
@@ -365,7 +375,8 @@
       { titulo:'Sin integración continua',
         texto:'Con un único test, nada impide subir un cambio que rompa los permisos que acaban de arreglarse.' }
     ],
-    notas: ''
+    notas: '',
+    ignorados: []
   };
 
   let datos = cargar();
@@ -391,6 +402,7 @@
       if (!d || !Array.isArray(d.tarjetas)) return clonar(INICIAL);
       if (!Array.isArray(d.impedimentos)) d.impedimentos = clonar(INICIAL.impedimentos);
       if (typeof d.notas !== 'string') d.notas = '';
+      if (!Array.isArray(d.ignorados)) d.ignorados = [];
       return d;
     }catch(e){
       return clonar(INICIAL);
@@ -557,6 +569,10 @@
     borrar.type = 'button';
     borrar.addEventListener('click', function(){
       if (!confirm('¿Borrar la tarjeta «' + (t.titulo || t.id) + '»?')) return;
+      if (t.auto && t.hash){
+        if (!Array.isArray(datos.ignorados)) datos.ignorados = [];
+        datos.ignorados.push(t.hash);
+      }
       datos.tarjetas = datos.tarjetas.filter(function(x){ return x !== t; });
       guardar(); render();
     });
@@ -592,15 +608,100 @@
     }
   }
 
+  /* ---------------- enlace con el historial de Git ---------------- */
+  function hashesDeTarjeta(t){
+    const texto = [t.titulo, t.desc, t.meta].join(' ');
+    return texto.match(/[0-9a-f]{7,40}/g) || [];
+  }
+
+  function sincronizarHistorial(){
+    const historial = window.HISTORIAL_GIT;
+    if (!historial || !Array.isArray(historial.commits)) return 0;
+    if (!Array.isArray(datos.ignorados)) datos.ignorados = [];
+
+    const referenciados = {};
+    datos.tarjetas.forEach(function(t){
+      hashesDeTarjeta(t).forEach(function(h){ referenciados[h] = true; });
+    });
+
+    let nuevos = 0;
+    historial.commits.slice().reverse().forEach(function(c){
+      if (!c || !c.hash) return;
+      if (referenciados[c.hash] || referenciados[c.corto]) return;
+      if (datos.ignorados.indexOf(c.hash) !== -1) return;
+      datos.tarjetas.push({
+        id: 'GIT-' + c.corto,
+        estado: 'hecho',
+        epica: 'commit',
+        prio: 'p2',
+        propia: false,
+        auto: true,
+        hash: c.hash,
+        titulo: c.asunto || ('Commit ' + c.corto),
+        desc: 'Commit de ' + (c.autor || 'autor desconocido') + ' el ' + (c.fecha || '?') + ', añadido automáticamente desde Git.',
+        meta: c.corto
+      });
+      nuevos++;
+    });
+    return nuevos;
+  }
+
+  function renderSync(){
+    const caja = document.getElementById('sync');
+    if (!caja) return;
+    caja.textContent = '';
+    const historial = window.HISTORIAL_GIT;
+
+    if (!historial || !Array.isArray(historial.commits)){
+      caja.appendChild(el('span', 'pill aviso', 'Git sin enlazar'));
+      const texto = el('span');
+      texto.appendChild(document.createTextNode('No encuentro '));
+      texto.appendChild(el('code', null, 'docs/historial-git.js'));
+      texto.appendChild(document.createTextNode('. Genéralo con '));
+      texto.appendChild(el('code', null, 'sh tools/instalar-hook-pizarra.sh'));
+      texto.appendChild(document.createTextNode(' (o sirve la pizarra con '));
+      texto.appendChild(el('code', null, 'node tools/servir-pizarra.mjs'));
+      texto.appendChild(document.createTextNode(').'));
+      caja.appendChild(texto);
+      return;
+    }
+
+    const automaticas = datos.tarjetas.filter(function(t){ return t.auto; }).length;
+    const fecha = historial.generado ? new Date(historial.generado).toLocaleString('es-MX') : '—';
+
+    caja.appendChild(el('span', 'pill', 'Git enlazado'));
+    const detalle = el('span');
+    detalle.appendChild(document.createTextNode('Rama '));
+    detalle.appendChild(el('code', null, historial.rama || '?'));
+    detalle.appendChild(document.createTextNode(' · ' + (historial.total || 0) + ' commits · ' + automaticas + ' convertidos en tarjeta · actualizado ' + fecha));
+    caja.appendChild(detalle);
+  }
+
+  function recargarHistorial(){
+    try{
+      const s = document.createElement('script');
+      s.src = 'historial-git.js?t=' + Date.now();
+      s.onload = function(){
+        s.remove();
+        if (sincronizarHistorial() > 0){ guardar(); render(); }
+        else { renderSync(); }
+      };
+      s.onerror = function(){ s.remove(); };
+      document.head.appendChild(s);
+    }catch(e){ /* abierta como archivo local: se actualiza al recargar */ }
+  }
+
   /* ---------------- chips y progreso ---------------- */
   function renderChips(){
     const total = datos.tarjetas.length;
     const hechas = datos.tarjetas.filter(function(t){ return t.estado === 'hecho'; }).length;
     const propias = datos.tarjetas.filter(function(t){ return t.propia; }).length;
+    const historial = window.HISTORIAL_GIT;
+    const commits = historial && historial.total ? historial.total : 0;
     const chips = document.getElementById('chips');
     chips.textContent = '';
     [
-      ['4', ' commits del sprint'],
+      [String(commits), ' commits en Git'],
       [String(hechas) + ' de ' + total, ' tarjetas cerradas'],
       [String(propias), ' añadidas por ti'],
       [String(datos.impedimentos.length), ' impedimentos']
@@ -611,6 +712,7 @@
       c.appendChild(document.createTextNode(par[1]));
       chips.appendChild(c);
     });
+    renderSync();
   }
 
   function actualizarProgreso(){
@@ -776,14 +878,16 @@
               id: String(t.id || 'SC-?'), estado: COLUMNAS.some(function(c){ return c.estado === t.estado; }) ? t.estado : 'backlog',
               epica: EPICAS.indexOf(t.epica) !== -1 ? t.epica : 'general',
               prio: PRIOS.indexOf(t.prio) !== -1 ? t.prio : 'p2',
-              propia: !!t.propia, titulo: String(t.titulo || 'Sin título'),
+              propia: !!t.propia, auto: !!t.auto, hash: t.hash ? String(t.hash) : '',
+              titulo: String(t.titulo || 'Sin título'),
               desc: String(t.desc || ''), meta: String(t.meta || '')
             };
           }),
           impedimentos: Array.isArray(d.impedimentos) ? d.impedimentos.map(function(i){
             return { titulo: String(i.titulo || 'Impedimento'), texto: String(i.texto || '') };
           }) : [],
-          notas: typeof d.notas === 'string' ? d.notas : ''
+          notas: typeof d.notas === 'string' ? d.notas : '',
+          ignorados: Array.isArray(d.ignorados) ? d.ignorados.map(String) : []
         };
         notas.value = datos.notas;
         guardar(); render();
@@ -810,8 +914,10 @@
 
   /* ---------------- arranque ---------------- */
   notas.value = datos.notas;
+  if (sincronizarHistorial() > 0) guardar();
   renderFiltros();
   render();
+  setInterval(recargarHistorial, 8000);
 })();
 </script>
 </body>
