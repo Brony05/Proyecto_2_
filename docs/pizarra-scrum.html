@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pizarra Scrum — Sistema Clínico UBAM</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --ink:#16202c; --muted:#65738a;
+    --line:#e3e8ef; --brand:#0f766e; --brand-soft:#e6f4f1;
+    --done:#15803d; --done-soft:#e7f6ec;
+    --doing:#b45309; --doing-soft:#fdf2e3;
+    --review:#4338ca; --review-soft:#ecebfd;
+    --todo:#475569; --todo-soft:#eef1f6;
+    --p0:#b91c1c; --p1:#b45309; --p2:#475569;
+    --shadow:0 1px 2px rgba(16,32,44,.06), 0 8px 24px -12px rgba(16,32,44,.18);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 "Segoe UI",Roboto,system-ui,-apple-system,sans-serif;
+  }
+  .wrap{max-width:1500px; margin:0 auto; padding:26px 22px 60px}
+
+  /* ---------- encabezado ---------- */
+  header.top{display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; justify-content:space-between; margin-bottom:16px}
+  h1{margin:0; font-size:24px; letter-spacing:-.02em}
+  h1 span{color:var(--brand)}
+  .sub{margin:6px 0 0; color:var(--muted); font-size:13.5px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{
+    background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:6px 12px; font-size:12.5px; color:var(--muted); box-shadow:var(--shadow)
+  }
+  .chip b{color:var(--ink); font-weight:600}
+
+  /* ---------- barra de herramientas ---------- */
+  .toolbar{
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px; box-shadow:var(--shadow); margin-bottom:14px
+  }
+  .toolbar .sep{flex:1}
+  button.btn{
+    font:inherit; font-size:13px; cursor:pointer; padding:7px 13px; border-radius:9px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); transition:.15s
+  }
+  button.btn:hover{border-color:#c2cddb; background:#f8fafc}
+  button.btn.primary{background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600}
+  button.btn.primary:hover{background:#0d6560}
+  button.btn.danger{color:var(--p0); border-color:#f0c9c9}
+  button.btn.danger:hover{background:#fdf3f3}
+  button.btn.small{font-size:12px; padding:4px 9px; border-radius:7px}
+  .estado-guardado{font-size:12.5px; color:var(--muted); min-width:120px; text-align:right}
+  .estado-guardado.ok{color:var(--done)}
+  .modo-on{outline:3px solid var(--brand-soft); outline-offset:2px}
+  .ayuda{font-size:12.3px; color:var(--muted); margin:-4px 0 14px; display:none}
+  .ayuda.visible{display:block}
+  [contenteditable="true"]{outline:none}
+  [contenteditable="true"]:focus{background:#fffdf2; box-shadow:inset 0 0 0 2px #f0e2a8; border-radius:5px}
+
+  /* ---------- progreso ---------- */
+  .progress-box{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:16px 18px; box-shadow:var(--shadow); margin-bottom:16px;
+  }
+  .progress-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:10px}
+  .progress-head strong{font-size:14px}
+  .progress-head small{color:var(--muted)}
+  .bar{height:10px; background:var(--todo-soft); border-radius:999px; overflow:hidden; display:flex}
+  .bar i{display:block; height:100%; transition:width .25s}
+  .legend{display:flex; flex-wrap:wrap; gap:16px; margin-top:10px; font-size:12.5px; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .dot{width:9px; height:9px; border-radius:3px; display:inline-block}
+
+  /* ---------- filtros ---------- */
+  .filters{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px}
+  .filters button{
+    font:inherit; font-size:13px; cursor:pointer; padding:7px 13px; border-radius:9px;
+    border:1px solid var(--line); background:var(--panel); color:var(--muted); transition:.15s
+  }
+  .filters button:hover{border-color:#c9d3e0; color:var(--ink)}
+  .filters button.on{background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600}
+  .filters input{
+    font:inherit; font-size:13px; padding:8px 12px; border-radius:9px; min-width:220px;
+    border:1px solid var(--line); background:var(--panel); color:var(--ink)
+  }
+  .filters input:focus{outline:2px solid var(--brand-soft); border-color:var(--brand)}
+
+  /* ---------- tablero ---------- */
+  .board{display:grid; grid-template-columns:repeat(4,minmax(260px,1fr)); gap:14px; align-items:start}
+  @media (max-width:1150px){ .board{grid-template-columns:repeat(2,minmax(260px,1fr))} }
+  @media (max-width:680px){ .board{grid-template-columns:1fr} }
+
+  .col{background:#eef1f6; border:1px solid var(--line); border-radius:14px; padding:12px; min-height:120px}
+  .col-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 4px 10px}
+  .col-head h2{margin:0; font-size:13px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted)}
+  .col-head .head-der{display:flex; align-items:center; gap:6px}
+  .count{
+    min-width:24px; text-align:center; font-size:12px; font-weight:700; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:1px 7px
+  }
+  .col[data-state="hecho"] .col-head h2{color:var(--done)}
+  .col[data-state="revision"] .col-head h2{color:var(--review)}
+  .col[data-state="curso"] .col-head h2{color:var(--doing)}
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:11px;
+    padding:12px 13px; margin-bottom:10px; box-shadow:var(--shadow);
+    border-left:4px solid var(--todo); position:relative
+  }
+  .card[data-state="hecho"]{border-left-color:var(--done)}
+  .card[data-state="revision"]{border-left-color:var(--review)}
+  .card[data-state="curso"]{border-left-color:var(--doing)}
+  .card.propia{border-left-style:dashed}
+  .card .id{font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--muted); display:flex; align-items:center; gap:6px}
+  .card .id .yo{font-size:9.5px; letter-spacing:.06em; background:var(--brand-soft); color:var(--brand); border-radius:4px; padding:1px 5px; font-weight:700}
+  .card h3{margin:3px 0 6px; font-size:14.5px; line-height:1.35}
+  .card p{margin:0 0 9px; font-size:12.8px; color:var(--muted); line-height:1.45}
+  .tags{display:flex; flex-wrap:wrap; gap:5px; margin-bottom:9px}
+  .tag{font-size:11px; padding:2px 8px; border-radius:999px; background:var(--todo-soft); color:var(--todo)}
+  .tag.permisos{background:var(--brand-soft); color:var(--brand)}
+  .tag.seguridad{background:#fdeaea; color:var(--p0)}
+  .tag.derivaciones{background:#eef2ff; color:#4338ca}
+  .tag.asignaciones{background:#eff6ff; color:#1d4ed8}
+  .tag.frontend{background:#fdf2f8; color:#9d174d}
+  .tag.calidad{background:#f0f9ff; color:#0369a1}
+  .tag.datos{background:#f7fee7; color:#4d7c0f}
+  .tag.general{background:#f1f5f9; color:#475569}
+  .meta{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--muted); border-top:1px dashed var(--line); padding-top:8px}
+  .prio{font-weight:700; font-size:11px; letter-spacing:.04em}
+  .prio.p0{color:var(--p0)} .prio.p1{color:var(--p1)} .prio.p2{color:var(--p2)}
+  code{font-family:ui-monospace,Consolas,monospace; font-size:11.5px; background:var(--todo-soft); padding:1px 5px; border-radius:5px; color:var(--ink)}
+
+  /* controles dentro de la tarjeta, solo en modo edición */
+  .card-controls{display:none; gap:6px; flex-wrap:wrap; margin-top:9px; padding-top:9px; border-top:1px dashed var(--line)}
+  body.editando .card-controls{display:flex}
+  .card-controls select, .card-controls input{
+    font:inherit; font-size:11.5px; padding:3px 6px; border-radius:6px;
+    border:1px solid var(--line); background:#fff; color:var(--ink)
+  }
+  .card-controls .del{margin-left:auto}
+  .vacio{display:none; padding:14px 8px; font-size:12.5px; color:var(--muted); text-align:center}
+
+  /* ---------- paneles inferiores ---------- */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:20px}
+  @media (max-width:900px){ .grid2{grid-template-columns:1fr} }
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 4px; font-size:15.5px}
+  .panel .hint{margin:0 0 14px; font-size:12.5px; color:var(--muted)}
+  .panel ul{margin:0; padding-left:20px; font-size:13.2px; color:#33414f}
+  .panel li{margin-bottom:8px}
+  .panel li b{color:var(--ink)}
+  .panel li span{color:var(--muted)}
+  .imped{border-left:3px solid var(--p0); background:#fef7f7; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; position:relative}
+  .imped b{display:block; margin-bottom:2px}
+  .imped .del{position:absolute; top:6px; right:6px}
+  .notas{
+    width:100%; min-height:230px; resize:vertical; font:13.5px/1.6 "Segoe UI",Roboto,system-ui,sans-serif;
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px; color:var(--ink);
+    background:#fffef9; box-shadow:inset 0 1px 3px rgba(16,32,44,.05)
+  }
+  .notas:focus{outline:2px solid var(--brand-soft); border-color:var(--brand)}
+  footer{margin-top:24px; font-size:12px; color:var(--muted); text-align:center; line-height:1.7}
+
+  @media print{
+    body{background:#fff}
+    .filters,.toolbar,.ayuda{display:none !important}
+    .card-controls{display:none !important}
+    .card,.panel,.progress-box{box-shadow:none}
+    .board{grid-template-columns:repeat(4,1fr)}
+    .notas{border:none; background:#fff; min-height:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Pizarra Scrum · <span>Sistema Clínico UBAM</span></h1>
+      <p class="sub">Sprint 3 — asignaciones, derivaciones y blindaje de permisos · actualizada el 10 de noviembre de 2026</p>
+    </div>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn primary" id="btn-editar">✎ Editar pizarra</button>
+    <button class="btn" id="btn-exportar">↓ Descargar JSON</button>
+    <button class="btn" id="btn-importar">↑ Importar JSON</button>
+    <input type="file" id="archivo" accept="application/json,.json" hidden>
+    <button class="btn danger" id="btn-restaurar">Restaurar original</button>
+    <span class="sep"></span>
+    <span class="estado-guardado" id="guardado">Cambios guardados en este navegador</span>
+  </div>
+  <p class="ayuda" id="ayuda">
+    Modo edición activo: haz clic en un título o descripción para escribir, usa los controles de cada tarjeta para
+    moverla de columna, cambiar su prioridad o borrarla, y «+ Tarjeta» para añadir la tuya. Todo se guarda
+    automáticamente en este navegador; usa <b>Descargar JSON</b> para llevarte una copia o pasármela.
+  </p>
+
+  <section class="progress-box">
+    <div class="progress-head">
+      <strong>Avance del sprint</strong>
+      <small id="ratio">—</small>
+    </div>
+    <div class="bar">
+      <i id="bar-done" style="background:var(--done); width:0"></i>
+      <i id="bar-review" style="background:var(--review); width:0"></i>
+      <i id="bar-doing" style="background:var(--doing); width:0"></i>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--done)"></i> Hecho y verificado</span>
+      <span><i class="dot" style="background:var(--review)"></i> En revisión</span>
+      <span><i class="dot" style="background:var(--doing)"></i> En curso</span>
+      <span><i class="dot" style="background:var(--todo)"></i> Backlog</span>
+      <span><i class="dot" style="background:var(--brand)"></i> Tarjeta propia (añadida por ti)</span>
+    </div>
+  </section>
+
+  <div class="filters" id="filters">
+    <input id="q" type="search" placeholder="Buscar en la pizarra…" aria-label="Buscar en la pizarra">
+  </div>
+
+  <main class="board" id="board"></main>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2>Definición de terminado</h2>
+      <p class="hint">Una tarjeta no pasa a «Hecho» solo por compilar.</p>
+      <ul>
+        <li><b>Compila y arranca</b> <span>— <code>./mvnw compile</code> y la app levanta en un puerto libre.</span></li>
+        <li><b>Probado contra la app real</b> <span>— no basta la lectura del código: se ejercita con sesiones de distintos roles.</span></li>
+        <li><b>Roles negativos incluidos</b> <span>— se comprueba también el 403, no solo el camino feliz.</span></li>
+        <li><b>Sin vistas rotas</b> <span>— si cambia un endpoint, se revisan todas sus llamadas en el frontend.</span></li>
+        <li><b>Commit en español y con motivo</b> <span>— el mensaje explica por qué se hizo, no solo qué se tocó.</span></li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Impedimentos</h2>
+      <p class="hint">Lo que frena el cierre del sprint.</p>
+      <div id="impedimentos"></div>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:14px">
+    <h2>Notas del equipo</h2>
+    <p class="hint">Espacio libre para ti: acuerdos, dudas, lo que quieras anotar durante la revisión. Se guarda en este navegador.</p>
+    <textarea class="notas" id="notas" placeholder="Escribe aquí tus anotaciones…"></textarea>
+  </section>
+
+  <footer>
+    Fuente de verdad del estado del proyecto: el historial de Git · esta pizarra es una foto editable que vive en tu navegador.<br>
+    Los cambios no se publican solos: descarga el JSON si quieres que yo los tome en cuenta.
+  </footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const CLAVE = 'pizarra-scrum-ubam-v1';
+  const COLUMNAS = [
+    { estado:'backlog',  titulo:'Backlog priorizado' },
+    { estado:'curso',    titulo:'En curso' },
+    { estado:'revision', titulo:'En revisión' },
+    { estado:'hecho',    titulo:'Hecho' }
+  ];
+  const EPICAS = ['permisos','derivaciones','asignaciones','seguridad','frontend','calidad','datos','general'];
+  const PRIOS = ['p0','p1','p2'];
+
+  const INICIAL = {
+    version: 1,
+    tarjetas: [
+      { id:'SC-01', estado:'backlog', epica:'seguridad', prio:'p0', propia:false,
+        titulo:'Rotar y sacar los secretos del repositorio',
+        desc:'La contraseña de MySQL y la app password de Gmail están en application.properties y ya viven en el historial de Git. Ignorar archivos no borra lo commiteado.',
+        meta:'requiere al usuario' },
+      { id:'SC-02', estado:'backlog', epica:'calidad', prio:'p1', propia:false,
+        titulo:'Cobertura de tests de permisos',
+        desc:'Hoy existe un solo test. Los permisos de citas, notas y derivaciones se validaron a mano con curl y quedan sin red de seguridad.',
+        meta:'~8 casos MockMvc' },
+      { id:'SC-03', estado:'backlog', epica:'datos', prio:'p1', propia:false,
+        titulo:'Evitar la doble reserva de un horario',
+        desc:'Dos peticiones simultáneas pueden crear dos citas en el mismo horario y profesional: no hay restricción única en la base.',
+        meta:'constraint + manejo de error' },
+      { id:'SC-04', estado:'backlog', epica:'datos', prio:'p1', propia:false,
+        titulo:'Endurecer el esquema de la base',
+        desc:'ddl-auto=update y show-sql=true están activos: el esquema cambia solo y cada consulta con datos de pacientes se imprime en el log.',
+        meta:'perfiles por entorno' },
+      { id:'SC-05', estado:'backlog', epica:'asignaciones', prio:'p1', propia:false,
+        titulo:'Bandeja de pacientes sin profesional',
+        desc:'Detectar pacientes huérfanos y permitir asignarlos en lote desde la vista del jefe, en lugar de uno por uno.',
+        meta:'jefe por departamento' },
+      { id:'SC-06', estado:'backlog', epica:'asignaciones', prio:'p2', propia:false,
+        titulo:'Historial de asignaciones',
+        desc:'Hoy solo se ve la asignación vigente: quién atendió a un paciente antes y cuándo se liberó queda invisible.',
+        meta:'vista de expediente' },
+      { id:'SC-07', estado:'backlog', epica:'derivaciones', prio:'p2', propia:false,
+        titulo:'Aviso de derivación pendiente',
+        desc:'El jefe destino solo se entera al entrar a la bandeja; conviene un contador visible y, después, correo.',
+        meta:'badge + correo' },
+      { id:'SC-08', estado:'backlog', epica:'derivaciones', prio:'p2', propia:false,
+        titulo:'Derivar desde la lista de espera',
+        desc:'Quien espera un cupo no tiene hoy un camino para pedir cambio de departamento sin cita previa.',
+        meta:'enganche con lista de espera' },
+      { id:'SC-09', estado:'backlog', epica:'frontend', prio:'p2', propia:false,
+        titulo:'Unificar el JavaScript del frontend',
+        desc:'Unas 2,500 líneas duplicadas entre vistas con pequeñas variaciones; cada arreglo se hace tres o cuatro veces.',
+        meta:'refactor por partes' },
+
+      { id:'SC-10', estado:'curso', epica:'frontend', prio:'p1', propia:false,
+        titulo:'Rediseño de las vistas de admin y director',
+        desc:'admin.html, director.html, sus JS y la hoja css/admin.css están modificados sin commitear, con la identidad visual nueva.',
+        meta:'4 archivos + 1 nuevo' },
+      { id:'SC-11', estado:'curso', epica:'frontend', prio:'p1', propia:false,
+        titulo:'Rediseño de psicología y psiquiatría',
+        desc:'psicologo.html y psiquiatra.html con cambios de diseño pendientes de cerrar y commitear.',
+        meta:'2 archivos' },
+      { id:'SC-12', estado:'curso', epica:'seguridad', prio:'p2', propia:false,
+        titulo:'Limpiar datos de prueba de la base',
+        desc:'Quedan citas y derivaciones marcadas «E2E» del paciente 12 (asignación #56, cita #806) que no deberían sobrevivir a la demo.',
+        meta:'limpieza' },
+
+      { id:'SC-13', estado:'revision', epica:'permisos', prio:'p0', propia:false,
+        titulo:'Cierre de tres huecos de permisos',
+        desc:'Cita por id, exportación de PDF y lectura de notas. 8/8 comprobaciones contra la app real; falta tu revisión y el push.',
+        meta:'11f94cc · local' },
+      { id:'SC-14', estado:'revision', epica:'seguridad', prio:'p0', propia:false,
+        titulo:'Respaldos fuera de Git',
+        desc:'backups/, *.sql y .env ya se ignoran; los archivos que ya estaban versionados en el pasado siguen en el historial.',
+        meta:'53920e2 · local' },
+      { id:'SC-15', estado:'revision', epica:'derivaciones', prio:'p1', propia:false,
+        titulo:'Derivaciones entre departamentos',
+        desc:'Solicitud, bandeja del jefe destino, aprobación que crea asignación y cita, y liberación del origen. 12/12 checks; sin push.',
+        meta:'72d1ca3 · local' },
+
+      { id:'SC-16', estado:'hecho', epica:'asignaciones', prio:'p1', propia:false,
+        titulo:'Asignaciones paciente–profesional',
+        desc:'Modelo, API, auto-asignación al agendar, notas por asignación o cita y pestaña del jefe.',
+        meta:'1f5ed6c · pusheado' },
+      { id:'SC-17', estado:'hecho', epica:'permisos', prio:'p1', propia:false,
+        titulo:'Notas legibles por asignación o cita',
+        desc:'Quien puede escribir una nota ahora puede leerla: se acabó el 403 del paciente derivado sin fecha de cita.',
+        meta:'11f94cc' },
+      { id:'SC-18', estado:'hecho', epica:'frontend', prio:'p2', propia:false,
+        titulo:'Identidad visual clínica',
+        desc:'Login, registro, paciente, doctor, jefe y enfermero con el rediseño nuevo ya commiteado.',
+        meta:'b49cf71 · ef0e7a6' },
+      { id:'SC-19', estado:'hecho', epica:'calidad', prio:'p2', propia:false,
+        titulo:'Blindaje del bot de IA',
+        desc:'Respuestas con tono profesional y defensa contra prompt injection en el asistente.',
+        meta:'3dbb6f5' },
+      { id:'SC-20', estado:'hecho', epica:'datos', prio:'p2', propia:false,
+        titulo:'Datos realistas de demostración',
+        desc:'Pacientes, citas y expedientes de ejemplo para que la demo no se vea vacía al defender el proyecto.',
+        meta:'1840379' }
+    ],
+    impedimentos: [
+      { titulo:'Secretos vivos en el historial de Git',
+        texto:'La contraseña de MySQL y la de aplicación de Gmail siguen siendo válidas y quedaron commiteadas. Requiere que tú rotes las credenciales: ignorar archivos solo protege el futuro.' },
+      { titulo:'Tres commits sin publicar',
+        texto:'Derivaciones, permisos y .gitignore viven solo en tu equipo. No se suben sin tu autorización.' },
+      { titulo:'Sin integración continua',
+        texto:'Con un único test, nada impide subir un cambio que rompa los permisos que acaban de arreglarse.' }
+    ],
+    notas: ''
+  };
+
+  let datos = cargar();
+  let filtro = 'todas';
+  let modoEdicion = false;
+  let tGuardado = null;
+
+  const board = document.getElementById('board');
+  const contenedorFiltros = document.getElementById('filters');
+  const buscador = document.getElementById('q');
+  const ayuda = document.getElementById('ayuda');
+  const etiquetaGuardado = document.getElementById('guardado');
+  const notas = document.getElementById('notas');
+
+  /* ---------------- persistencia ---------------- */
+  function clonar(o){ return JSON.parse(JSON.stringify(o)); }
+
+  function cargar(){
+    try{
+      const guardado = localStorage.getItem(CLAVE);
+      if (!guardado) return clonar(INICIAL);
+      const d = JSON.parse(guardado);
+      if (!d || !Array.isArray(d.tarjetas)) return clonar(INICIAL);
+      if (!Array.isArray(d.impedimentos)) d.impedimentos = clonar(INICIAL.impedimentos);
+      if (typeof d.notas !== 'string') d.notas = '';
+      return d;
+    }catch(e){
+      return clonar(INICIAL);
+    }
+  }
+
+  function guardar(){
+    clearTimeout(tGuardado);
+    etiquetaGuardado.classList.remove('ok');
+    etiquetaGuardado.textContent = 'Guardando…';
+    tGuardado = setTimeout(function(){
+      try{
+        localStorage.setItem(CLAVE, JSON.stringify(datos));
+        etiquetaGuardado.classList.add('ok');
+        etiquetaGuardado.textContent = '✓ Guardado en este navegador';
+      }catch(e){
+        etiquetaGuardado.classList.remove('ok');
+        etiquetaGuardado.textContent = 'No se pudo guardar (memoria llena)';
+      }
+    }, 350);
+  }
+
+  /* ---------------- utilidades ---------------- */
+  function tarjetaPorId(id){ return datos.tarjetas.find(function(t){ return t.id === id; }); }
+
+  function letraPrio(p){ return { p0:'P0 · bloqueante', p1:'P1', p2:'P2' }[p] || p; }
+
+  function el(tag, clase, texto){
+    const n = document.createElement(tag);
+    if (clase) n.className = clase;
+    if (texto !== undefined) n.textContent = texto;
+    return n;
+  }
+
+  function editarSi(nodo, fn){
+    nodo.contentEditable = modoEdicion ? 'true' : 'false';
+    nodo.spellcheck = modoEdicion;
+    if (modoEdicion){
+      nodo.addEventListener('input', function(){ fn(nodo.textContent); guardar(); });
+      nodo.addEventListener('keydown', function(ev){
+        if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); nodo.blur(); }
+      });
+    }
+  }
+
+  /* ---------------- render del tablero ---------------- */
+  function render(){
+    board.textContent = '';
+
+    COLUMNAS.forEach(function(col){
+      const seccion = el('section', 'col');
+      seccion.dataset.state = col.estado;
+
+      const cabecera = el('div', 'col-head');
+      cabecera.appendChild(el('h2', null, col.titulo));
+      const der = el('div', 'head-der');
+      const contador = el('span', 'count', '0');
+      der.appendChild(contador);
+      if (modoEdicion){
+        const mas = el('button', 'btn small', '+ Tarjeta');
+        mas.type = 'button';
+        mas.title = 'Añadir una tarjeta a ' + col.titulo;
+        mas.addEventListener('click', function(){ nuevaTarjeta(col.estado); });
+        der.appendChild(mas);
+      }
+      cabecera.appendChild(der);
+      seccion.appendChild(cabecera);
+
+      const visibles = datos.tarjetas.filter(function(t){ return t.estado === col.estado; });
+      visibles.forEach(function(t){ seccion.appendChild(tarjeta(t)); });
+
+      const vacio = el('div', 'vacio', 'Sin tarjetas en esta columna');
+      vacio.dataset.vacio = '1';
+      seccion.appendChild(vacio);
+
+      board.appendChild(seccion);
+    });
+
+    aplicarFiltros();
+    renderChips();
+    renderImpedimentos();
+    actualizarProgreso();
+  }
+
+  function tarjeta(t){
+    const art = el('article', 'card');
+    art.dataset.state = t.estado;
+    art.dataset.epica = t.epica || 'general';
+    art.dataset.id = t.id;
+    if (t.propia) art.classList.add('propia');
+
+    const id = el('div', 'id');
+    id.appendChild(el('span', null, t.id));
+    if (t.propia) id.appendChild(el('span', 'yo', 'TUYA'));
+    art.appendChild(id);
+
+    const h3 = el('h3', null, t.titulo);
+    editarSi(h3, function(v){ t.titulo = v; });
+    art.appendChild(h3);
+
+    const p = el('p', null, t.desc);
+    editarSi(p, function(v){ t.desc = v; });
+    art.appendChild(p);
+
+    const tags = el('div', 'tags');
+    tags.appendChild(el('span', 'tag ' + (t.epica || 'general'), t.epica || 'general'));
+    tags.appendChild(el('span', 'tag', letraPrio(t.prio).toLowerCase()));
+    art.appendChild(tags);
+
+    const meta = el('div', 'meta');
+    meta.appendChild(el('span', 'prio ' + t.prio, letraPrio(t.prio).toUpperCase().replace(' · BLOQUEANTE','')));
+    const m = el('span', null, t.meta || '');
+    editarSi(m, function(v){ t.meta = v; });
+    meta.appendChild(m);
+    art.appendChild(meta);
+
+    art.appendChild(controles(t));
+    return art;
+  }
+
+  function controles(t){
+    const caja = el('div', 'card-controls');
+
+    const selEstado = el('select');
+    COLUMNAS.forEach(function(c){
+      const o = el('option', null, c.titulo);
+      o.value = c.estado;
+      if (c.estado === t.estado) o.selected = true;
+      selEstado.appendChild(o);
+    });
+    selEstado.title = 'Mover a otra columna';
+    selEstado.addEventListener('change', function(){
+      t.estado = selEstado.value;
+      guardar(); render();
+    });
+
+    const selEpica = el('select');
+    EPICAS.forEach(function(e){
+      const o = el('option', null, e);
+      o.value = e;
+      if (e === (t.epica || 'general')) o.selected = true;
+      selEpica.appendChild(o);
+    });
+    selEpica.title = 'Épica';
+    selEpica.addEventListener('change', function(){
+      t.epica = selEpica.value;
+      guardar(); render();
+    });
+
+    const selPrio = el('select');
+    PRIOS.forEach(function(p){
+      const o = el('option', null, p.toUpperCase());
+      o.value = p;
+      if (p === t.prio) o.selected = true;
+      selPrio.appendChild(o);
+    });
+    selPrio.title = 'Prioridad';
+    selPrio.addEventListener('change', function(){
+      t.prio = selPrio.value;
+      guardar(); render();
+    });
+
+    const borrar = el('button', 'btn small danger del', 'Borrar');
+    borrar.type = 'button';
+    borrar.addEventListener('click', function(){
+      if (!confirm('¿Borrar la tarjeta «' + (t.titulo || t.id) + '»?')) return;
+      datos.tarjetas = datos.tarjetas.filter(function(x){ return x !== t; });
+      guardar(); render();
+    });
+
+    caja.appendChild(selEstado);
+    caja.appendChild(selEpica);
+    caja.appendChild(selPrio);
+    caja.appendChild(borrar);
+    return caja;
+  }
+
+  function nuevaTarjeta(estado){
+    const numero = datos.tarjetas.reduce(function(max, t){
+      const n = parseInt(String(t.id).replace(/\D/g, ''), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, 20) + 1;
+    const t = {
+      id: 'SC-' + String(numero).padStart(2, '0'),
+      estado: estado, epica: 'general', prio: 'p2', propia: true,
+      titulo: 'Nueva tarjeta',
+      desc: 'Describe aquí la tarea o la anotación.',
+      meta: ''
+    };
+    datos.tarjetas.unshift(t);
+    guardar(); render();
+    const nodo = board.querySelector('.card[data-id="' + t.id + '"] h3');
+    if (nodo){
+      nodo.focus();
+      const rango = document.createRange();
+      rango.selectNodeContents(nodo);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(rango);
+    }
+  }
+
+  /* ---------------- chips y progreso ---------------- */
+  function renderChips(){
+    const total = datos.tarjetas.length;
+    const hechas = datos.tarjetas.filter(function(t){ return t.estado === 'hecho'; }).length;
+    const propias = datos.tarjetas.filter(function(t){ return t.propia; }).length;
+    const chips = document.getElementById('chips');
+    chips.textContent = '';
+    [
+      ['4', ' commits del sprint'],
+      [String(hechas) + ' de ' + total, ' tarjetas cerradas'],
+      [String(propias), ' añadidas por ti'],
+      [String(datos.impedimentos.length), ' impedimentos']
+    ].forEach(function(par){
+      const c = el('div', 'chip');
+      const b = el('b', null, par[0]);
+      c.appendChild(b);
+      c.appendChild(document.createTextNode(par[1]));
+      chips.appendChild(c);
+    });
+  }
+
+  function actualizarProgreso(){
+    const total = datos.tarjetas.length || 1;
+    const cuenta = function(estado){
+      return datos.tarjetas.filter(function(t){ return t.estado === estado; }).length;
+    };
+    const hecho = cuenta('hecho'), revision = cuenta('revision'), curso = cuenta('curso');
+    const pct = function(n){ return (n / total * 100).toFixed(1) + '%'; };
+    document.getElementById('bar-done').style.width = pct(hecho);
+    document.getElementById('bar-review').style.width = pct(revision);
+    document.getElementById('bar-doing').style.width = pct(curso);
+    document.getElementById('ratio').textContent =
+      hecho + ' de ' + total + ' tarjetas cerradas · ' + revision + ' en revisión · ' + curso + ' en curso';
+  }
+
+  /* ---------------- impedimentos ---------------- */
+  function renderImpedimentos(){
+    const cont = document.getElementById('impedimentos');
+    cont.textContent = '';
+    if (datos.impedimentos.length === 0){
+      cont.appendChild(el('p', 'hint', 'Sin impedimentos registrados.'));
+    }
+    datos.impedimentos.forEach(function(imp, i){
+      const caja = el('div', 'imped');
+      const b = el('b', null, imp.titulo);
+      editarSi(b, function(v){ imp.titulo = v; });
+      const texto = el('span', null, imp.texto);
+      editarSi(texto, function(v){ imp.texto = v; });
+      caja.appendChild(b);
+      caja.appendChild(texto);
+      if (modoEdicion){
+        const del = el('button', 'btn small danger del', '×');
+        del.type = 'button';
+        del.title = 'Quitar este impedimento';
+        del.addEventListener('click', function(){
+          datos.impedimentos.splice(i, 1);
+          guardar(); render();
+        });
+        caja.appendChild(del);
+      }
+      cont.appendChild(caja);
+    });
+    if (modoEdicion){
+      const add = el('button', 'btn small', '+ Impedimento');
+      add.type = 'button';
+      add.addEventListener('click', function(){
+        datos.impedimentos.push({ titulo:'Nuevo impedimento', texto:'Descríbelo aquí.' });
+        guardar(); render();
+      });
+      cont.appendChild(add);
+    }
+  }
+
+  /* ---------------- filtros ---------------- */
+  function renderFiltros(){
+    const presentes = EPICAS.filter(function(e){
+      return datos.tarjetas.some(function(t){ return (t.epica || 'general') === e; });
+    });
+    contenedorFiltros.textContent = '';
+
+    const botones = [{ clave:'todas', texto:'Todas' }].concat(
+      presentes.map(function(e){ return { clave:e, texto:e.charAt(0).toUpperCase() + e.slice(1) }; })
+    );
+    botones.forEach(function(b){
+      const btn = el('button', null, b.texto);
+      btn.type = 'button';
+      btn.dataset.f = b.clave;
+      if (b.clave === filtro) btn.classList.add('on');
+      btn.addEventListener('click', function(){
+        filtro = b.clave;
+        renderFiltros();
+        aplicarFiltros();
+      });
+      contenedorFiltros.appendChild(btn);
+    });
+
+    buscador.id = 'q';
+    contenedorFiltros.appendChild(buscador);
+  }
+
+  function aplicarFiltros(){
+    const texto = buscador.value.trim().toLowerCase();
+    let totalVisibles = 0;
+
+    datos.tarjetas.forEach(function(t){
+      const nodo = board.querySelector('.card[data-id="' + t.id + '"]');
+      if (!nodo) return;
+      const epica = t.epica || 'general';
+      const coincideFiltro = filtro === 'todas' || epica === filtro;
+      const coincideTexto = !texto || nodo.textContent.toLowerCase().indexOf(texto) !== -1;
+      nodo.style.display = (coincideFiltro && coincideTexto) ? '' : 'none';
+    });
+
+    COLUMNAS.forEach(function(col){
+      const seccion = board.querySelector('.col[data-state="' + col.estado + '"]');
+      if (!seccion) return;
+      const visibles = [].slice.call(seccion.querySelectorAll('.card')).filter(function(n){
+        return n.style.display !== 'none';
+      }).length;
+      totalVisibles += visibles;
+      seccion.querySelector('.count').textContent = visibles;
+      const vacio = seccion.querySelector('[data-vacio]');
+      if (vacio) vacio.style.display = visibles === 0 ? 'block' : 'none';
+    });
+
+    if (totalVisibles === 0){
+      board.style.opacity = '.55';
+    } else {
+      board.style.opacity = '1';
+    }
+  }
+
+  buscador.addEventListener('input', aplicarFiltros);
+
+  /* ---------------- barra de herramientas ---------------- */
+  const btnEditar = document.getElementById('btn-editar');
+  btnEditar.addEventListener('click', function(){
+    modoEdicion = !modoEdicion;
+    document.body.classList.toggle('editando', modoEdicion);
+    btnEditar.classList.toggle('primary', modoEdicion);
+    btnEditar.textContent = modoEdicion ? '✓ Terminar edición' : '✎ Editar pizarra';
+    ayuda.classList.toggle('visible', modoEdicion);
+    board.classList.toggle('modo-on', modoEdicion);
+    render();
+  });
+
+  notas.addEventListener('input', function(){
+    datos.notas = notas.value;
+    guardar();
+  });
+
+  document.getElementById('btn-exportar').addEventListener('click', function(){
+    const contenido = JSON.stringify(datos, null, 2);
+    const blob = new Blob([contenido], { type:'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = 'pizarra-scrum-' + fecha + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    etiquetaGuardado.classList.add('ok');
+    etiquetaGuardado.textContent = '✓ JSON descargado';
+  });
+
+  const archivo = document.getElementById('archivo');
+  document.getElementById('btn-importar').addEventListener('click', function(){ archivo.click(); });
+  archivo.addEventListener('change', function(){
+    const f = archivo.files && archivo.files[0];
+    if (!f) return;
+    const lector = new FileReader();
+    lector.onload = function(){
+      try{
+        const d = JSON.parse(String(lector.result));
+        if (!d || !Array.isArray(d.tarjetas)) throw new Error('formato');
+        datos = {
+          version: 1,
+          tarjetas: d.tarjetas.map(function(t){
+            return {
+              id: String(t.id || 'SC-?'), estado: COLUMNAS.some(function(c){ return c.estado === t.estado; }) ? t.estado : 'backlog',
+              epica: EPICAS.indexOf(t.epica) !== -1 ? t.epica : 'general',
+              prio: PRIOS.indexOf(t.prio) !== -1 ? t.prio : 'p2',
+              propia: !!t.propia, titulo: String(t.titulo || 'Sin título'),
+              desc: String(t.desc || ''), meta: String(t.meta || '')
+            };
+          }),
+          impedimentos: Array.isArray(d.impedimentos) ? d.impedimentos.map(function(i){
+            return { titulo: String(i.titulo || 'Impedimento'), texto: String(i.texto || '') };
+          }) : [],
+          notas: typeof d.notas === 'string' ? d.notas : ''
+        };
+        notas.value = datos.notas;
+        guardar(); render();
+        etiquetaGuardado.classList.add('ok');
+        etiquetaGuardado.textContent = '✓ JSON importado';
+      }catch(e){
+        alert('El archivo no parece una pizarra exportada desde esta página.');
+      }finally{
+        archivo.value = '';
+      }
+    };
+    lector.readAsText(f);
+  });
+
+  document.getElementById('btn-restaurar').addEventListener('click', function(){
+    if (!confirm('Se perderán tus cambios y volverá la pizarra original. ¿Continuar?')) return;
+    localStorage.removeItem(CLAVE);
+    datos = clonar(INICIAL);
+    notas.value = datos.notas;
+    guardar(); render();
+    etiquetaGuardado.classList.add('ok');
+    etiquetaGuardado.textContent = 'Pizarra original restaurada';
+  });
+
+  /* ---------------- arranque ---------------- */
+  notas.value = datos.notas;
+  renderFiltros();
+  render();
+})();
+</script>
+</body>
+</html>
