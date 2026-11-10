@@ -199,8 +199,12 @@ public class NotaMedicaController {
             Usuario lector = usuarioRepository.findByUsername(username).orElse(null);
             if (lector != null && lector.getRol() != null
                     && List.of("DOCTOR", "PSICOLOGO", "PSIQUIATRA", "ENFERMERO", "TRABAJADOR_SOCIAL").contains(lector.getRol())) {
-                boolean esPropio = citaRepository.findByDoctorId(lector.getId()).stream()
-                        .anyMatch(c -> c.getCliente() != null && Long.valueOf(pacienteId).equals(c.getCliente().getId()));
+                // Mismo criterio que al crear la nota: asignación activa O cita con
+                // este profesional. Si solo se mirara la cita, un paciente derivado
+                // sin fecha de cita podría escribir notas pero no leer las anteriores.
+                boolean esPropio = asignacionRepository.existsByUsuarioIdAndClienteIdAndActivaTrue(lector.getId(), pacienteId)
+                        || citaRepository.findByDoctorId(lector.getId()).stream()
+                                .anyMatch(c -> c.getCliente() != null && Long.valueOf(pacienteId).equals(c.getCliente().getId()));
                 if (!esPropio) {
                     return ResponseEntity.status(403).body("Este paciente no está asignado a ti");
                 }

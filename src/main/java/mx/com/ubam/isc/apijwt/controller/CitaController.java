@@ -3,6 +3,7 @@ package mx.com.ubam.isc.apijwt.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import mx.com.ubam.isc.apijwt.model.Cita;import mx.com.ubam.isc.apijwt.model.Usuario;
@@ -106,11 +107,53 @@ public class CitaController {
         }
     }
 
+    // Una cita contiene datos personales del paciente (nombre, acompañante,
+    // teléfono, correo): no basta con estar autenticado para leerla por id.
     @GetMapping("/{id}")
     public ResponseEntity<?> obtener(@PathVariable Long id) {
-        return citaService.obtenerPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            Usuario usuario = usuarioRepository.findByUsername(username).orElse(null);
+            if (usuario == null) {
+                return ResponseEntity.status(401).body("Usuario no autenticado");
+            }
+
+            Cita cita = citaService.obtenerPorId(id).orElse(null);
+            if (cita == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            String rol = usuario.getRol();
+
+            // Administración, recepción y dirección consultan cualquier cita
+            if ("ADMIN".equals(rol) || "EMPLEADO".equals(rol)
+                    || "DIRECTOR".equals(rol) || "JEFE_ARCHIVO".equals(rol)) {
+                return ResponseEntity.ok(cita);
+            }
+
+            // El paciente solo ve sus propias citas
+            if ("PACIENTE".equals(rol)) {
+                Cliente cliente = clienteRepository.findByCorreo(usuario.getUsername());
+                if (cliente != null && cita.getCliente() != null
+                        && cliente.getId().equals(cita.getCliente().getId())) {
+                    return ResponseEntity.ok(cita);
+                }
+                return ResponseEntity.status(403).body("Esta cita no te pertenece");
+            }
+
+            // Personal clínico: solo las citas que atiende
+            if (ROLES_CLINICOS.contains(rol)) {
+                if (cita.getDoctor() != null && usuario.getId().equals(cita.getDoctor().getId())) {
+                    return ResponseEntity.ok(cita);
+                }
+                return ResponseEntity.status(403).body("Esta cita no está asignada a ti");
+            }
+
+            return ResponseEntity.status(403).body("No tienes permiso para ver esta cita");
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al obtener la cita: " + e.getMessage());
+        }
     }
 
     @GetMapping("/servicios")
@@ -669,7 +712,10 @@ public class CitaController {
         }
     }
 
+    // El PDF contiene el historial completo de citas del consultorio: solo
+    // administración y dirección pueden exportarlo.
     @GetMapping("/exportar-pdf")
+    @PreAuthorize("hasAnyRole('ADMIN','DIRECTOR')")
     public void exportarPdf(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
                             @RequestParam(defaultValue = "todas") String tipo,
