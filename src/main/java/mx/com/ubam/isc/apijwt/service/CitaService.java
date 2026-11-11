@@ -2,6 +2,7 @@ package mx.com.ubam.isc.apijwt.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import mx.com.ubam.isc.apijwt.model.Usuario;
 import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.model.Cita;
@@ -42,9 +43,14 @@ public class CitaService {
     }    // NOTA: verificarDisponibilidad global (por fecha/hora en TODO el hospital) se eliminó:
     // bloqueaba citas aunque los especialistas estuvieran libres. La disponibilidad real
     // se valida por doctor con verificarDisponibilidadDoctor.
+    /** Igual que la anterior, pero ignorando una cita concreta (reagendar al mismo horario). */
+    public boolean verificarDisponibilidadDoctor(Long doctorId, LocalDate fecha, LocalTime hora, Long excluir) {
+        return citaRepository.buscarCupoOcupado(doctorId, fecha, hora, excluir).isEmpty();
+    }
+
     public boolean verificarDisponibilidadDoctor(Long doctorId, LocalDate fecha, LocalTime hora) {
-        List<Cita> citasDoctor = citaRepository.findByDoctorIdAndFecha(doctorId, fecha);
-        return citasDoctor.stream().noneMatch(c -> c.getHora().equals(hora) && !"CANCELADA".equals(c.getEstado()));
+        return citaRepository.buscarCupoOcupado(doctorId, fecha, hora, null).isEmpty();
+
     }
     
     public List<String> getHorariosOcupados(LocalDate fecha) {
@@ -120,6 +126,7 @@ public class CitaService {
                         && !"CANCELADA".equals(c.getEstado()));
     }
 
+    @Transactional
     public Cita crear(Cita cita) {
         LocalDate hoy = LocalDate.now();
         LocalTime ahora = LocalTime.now();
@@ -146,6 +153,16 @@ public class CitaService {
             throw new RuntimeException("Las citas solo se pueden agendar en punto o media hora (ej: 9:00, 9:30)");
         }
         
+        // El cupo del especialista se valida también aquí, no solo en el controlador:
+        // cualquier camino que cree una cita (API, semillas, tareas) respeta la agenda.
+        // El bloqueo de la fila del doctor serializa dos reservas simultáneas.
+        if (cita.getDoctor() != null) {
+            usuarioRepository.bloquearPorId(cita.getDoctor().getId());
+            if (!verificarDisponibilidadDoctor(cita.getDoctor().getId(), cita.getFecha(), cita.getHora())) {
+                throw new RuntimeException("Ese horario ya está ocupado con " + nombreDe(cita.getDoctor()) + ". Elige otro horario.");
+            }
+        }
+
         // Ya NO se valida disponibilidad global: cada doctor tiene su propia agenda
         // y la verificación por doctor se hace antes de llamar a este método.
         
@@ -178,6 +195,13 @@ public class CitaService {
         return citaRepository.save(cita);
     }
 
+    private String nombreDe(Usuario usuario) {
+        if (usuario.getNombreCompleto() != null && !usuario.getNombreCompleto().isEmpty()) {
+            return usuario.getNombreCompleto();
+        }
+        return usuario.getUsername();
+    }
+
     public Cita cancelar(Long id) {
         Cita cita = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
@@ -201,6 +225,7 @@ public class CitaService {
         return citaCancelada;
     }
     
+    @Transactional
     public Cita reagendar(Long id, LocalDate nuevaFecha, LocalTime nuevaHora, String motivo) {
         Cita cita = citaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cita no encontrada"));
@@ -239,6 +264,15 @@ public class CitaService {
             }
         }
         
+        // El nuevo horario debe estar libre en la agenda del especialista que la atiende.
+        // Se excluye la propia cita para que reagendar al mismo horario no se bloquee solo.
+        if (cita.getDoctor() != null) {
+            usuarioRepository.bloquearPorId(cita.getDoctor().getId());
+            if (!verificarDisponibilidadDoctor(cita.getDoctor().getId(), nuevaFecha, nuevaHora, cita.getId())) {
+                throw new RuntimeException("El especialista ya tiene una cita en ese horario. Elige otro horario.");
+            }
+        }
+
         // Protección extra: la cita de Consulta Inicial solo se mueve si no hay OTRAS consultas iniciales activas
         if (cita.getCliente() != null && "Consulta Inicial".equals(cita.getServicio()) 
                 && yaTieneConsultaInicial(cita.getCliente().getId())) {

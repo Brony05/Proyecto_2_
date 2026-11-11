@@ -448,7 +448,7 @@ public class CitaController {
             }
             
             // Validar que el especialista asignado esté libre en el nuevo horario
-            if (cita.getDoctor() != null && !citaService.verificarDisponibilidadDoctor(cita.getDoctor().getId(), nuevaFecha, nuevaHora)) {
+            if (cita.getDoctor() != null && !citaService.verificarDisponibilidadDoctor(cita.getDoctor().getId(), nuevaFecha, nuevaHora, cita.getId())) {
                 return ResponseEntity.badRequest().body("El especialista no está disponible en ese horario. Elige otra hora.");
             }
             

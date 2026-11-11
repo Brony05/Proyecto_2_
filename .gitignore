@@ -39,6 +39,9 @@ backups/
 # Historial de Git generado para la pizarra Scrum (se regenera con el hook)
 docs/historial-git.js
 *.sql
+# Los scripts de esquema del proyecto sí se versionan
+!docs/sql/
+!docs/sql/*.sql
 
 ### Secretos ###
 .env
