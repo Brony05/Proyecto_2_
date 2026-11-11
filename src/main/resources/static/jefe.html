@@ -160,6 +160,30 @@
 
     <!-- ASIGNACIONES -->
     <div id="asignaciones" class="tab-content" style="display:none;">
+        <!-- Bandeja de pacientes huérfanos: nadie del personal los tiene asignados (SC-05) -->
+        <div class="table-container mb-3">
+            <h5><div class="ico ico-verde"><i class="fas fa-user-slash"></i></div> Pacientes sin profesional
+                <span class="badge bg-warning text-dark" id="contadorHuerfanos">0</span></h5>
+            <div class="text-muted small mb-2">Pacientes sin ninguna asignación activa. Marca varios y repártelos de una vez.</div>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Asignar los seleccionados a *</label>
+                    <select id="loteProfesional" class="form-select">
+                        <option value="">Seleccionar profesional</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex gap-2">
+                    <button class="btn btn-outline-secondary w-50" id="btnTodosHuerfanos" onclick="alternarTodosHuerfanos()">
+                        <i class="fas fa-check-double"></i> Todos / ninguno
+                    </button>
+                    <button class="btn btn-primary w-50" id="btnAsignarLote" disabled onclick="asignarHuerfanosLote()">
+                        <i class="fas fa-layer-group"></i> Asignar seleccionados
+                    </button>
+                </div>
+            </div>
+            <div id="listaHuerfanos" style="max-height: 240px; overflow-y: auto;" class="small text-muted">Cargando pacientes sin profesional...</div>
+        </div>
+
         <div class="row">
             <div class="col-md-5">
                 <div class="table-container">

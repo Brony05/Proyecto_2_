@@ -13,9 +13,11 @@ import mx.com.ubam.isc.apijwt.repository.ClienteRepository;
 import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.service.AuditoriaService;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Vínculo formal paciente–profesional, llamado también "asignaciones".
@@ -152,6 +154,99 @@ public class AsignacionController {
         }
     }
 
+    // ==================== BANDEJA: PACIENTES SIN PROFESIONAL (SC-05) ====================
+    @GetMapping("/huerfanos")
+    @PreAuthorize(PERMISO_GESTION)
+    public ResponseEntity<?> huerfanos() {
+        List<Map<String, Object>> salida = new ArrayList<>();
+        for (Cliente cliente : clienteRepository.findSinAsignacionActiva()) {
+            salida.add(datosDePaciente(cliente));
+        }
+        return ResponseEntity.ok(salida);
+    }
+
+    // ==================== ASIGNAR VARIOS PACIENTES DE UNA VEZ ====================
+    @PostMapping("/lote")
+    @PreAuthorize(PERMISO_GESTION)
+    @Transactional
+    public ResponseEntity<?> asignarLote(@RequestBody Map<String, Object> payload) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario actor = usuarioRepository.findByUsername(username).orElse(null);
+        if (actor == null) {
+            return ResponseEntity.status(401).body("Usuario no autenticado");
+        }
+
+        Number usuarioIdNum = (Number) payload.get("usuarioId");
+        Object idsRaw = payload.get("clienteIds");
+        if (usuarioIdNum == null || !(idsRaw instanceof List<?> ids) || ids.isEmpty()) {
+            return ResponseEntity.badRequest().body("usuarioId y clienteIds son obligatorios");
+        }
+        if (ids.size() > 200) {
+            return ResponseEntity.badRequest().body("Máximo 200 pacientes por lote");
+        }
+
+        Usuario profesional = usuarioRepository.findById(usuarioIdNum.longValue()).orElse(null);
+        if (profesional == null) {
+            return ResponseEntity.badRequest().body("Profesional no encontrado");
+        }
+        if (!ROLES_PERSONAL.contains(profesional.getRol())) {
+            return ResponseEntity.badRequest().body("Solo puedes asignar pacientes al personal clínico (DOCTOR, PSICOLOGO, PSIQUIATRA, ENFERMERO o TRABAJADOR_SOCIAL)");
+        }
+        String deptoProfesional = departamentoDe(profesional);
+        if (deptoProfesional == null) {
+            return ResponseEntity.badRequest().body("El profesional no pertenece a un departamento clínico");
+        }
+        if (!"ADMIN".equals(actor.getRol()) && !"DIRECTOR".equals(actor.getRol())) {
+            String deptoActor = departamentoDe(actor);
+            if (deptoActor == null || !deptoActor.equals(deptoProfesional)) {
+                return ResponseEntity.status(403).body("Solo puedes asignar pacientes a profesionales de tu propio departamento");
+            }
+        }
+
+        String motivo = payload.get("motivo") != null && !payload.get("motivo").toString().isBlank()
+                ? payload.get("motivo").toString()
+                : "Asignación en lote por jefatura";
+
+        int asignados = 0;
+        List<Map<String, Object>> omitidos = new ArrayList<>();
+        for (Object raw : ids) {
+            if (!(raw instanceof Number numero)) {
+                omitidos.add(omitido(null, "identificador inválido"));
+                continue;
+            }
+            Long clienteId = numero.longValue();
+            Cliente cliente = clienteRepository.findById(clienteId).orElse(null);
+            if (cliente == null) {
+                omitidos.add(omitido(clienteId, "el paciente ya no existe"));
+                continue;
+            }
+            // Solo se reparten huérfanos: si alguien ya lo tomó, no se duplica el vínculo.
+            if (!asignacionRepository.findByClienteIdAndActivaTrue(clienteId).isEmpty()) {
+                omitidos.add(omitido(clienteId, "ya tiene un profesional asignado"));
+                continue;
+            }
+
+            Asignacion asignacion = new Asignacion();
+            asignacion.setCliente(cliente);
+            asignacion.setUsuario(profesional);
+            asignacion.setDepartamento(deptoProfesional);
+            asignacion.setFechaInicio(LocalDate.now());
+            asignacion.setActiva(true);
+            asignacion.setMotivo(motivo);
+            asignacionRepository.save(asignacion);
+            asignados++;
+        }
+
+        auditoriaService.registrar(actor.getUsername(), "ASIGNACION",
+            "Asignación en lote: " + asignados + " paciente(s) a " + profesional.getUsername()
+            + " (" + deptoProfesional + ")" + (omitidos.isEmpty() ? "" : ", " + omitidos.size() + " omitido(s)"));
+
+        Map<String, Object> respuesta = new HashMap<>();
+        respuesta.put("asignados", asignados);
+        respuesta.put("omitidos", omitidos);
+        return ResponseEntity.ok(respuesta);
+    }
+
     // ==================== LIBERAR ASIGNACION (baja lógica) ====================
     @DeleteMapping("/{id}")
     @PreAuthorize(PERMISO_GESTION)
@@ -183,6 +278,22 @@ public class AsignacionController {
     }
 
     // ==================== UTILIDADES ====================
+
+    private Map<String, Object> datosDePaciente(Cliente cliente) {
+        Map<String, Object> fila = new HashMap<>();
+        fila.put("id", cliente.getId());
+        fila.put("nombre", cliente.getNombre());
+        fila.put("correo", cliente.getCorreo());
+        fila.put("telefono", cliente.getTelefono());
+        return fila;
+    }
+
+    private Map<String, Object> omitido(Long clienteId, String motivo) {
+        Map<String, Object> fila = new HashMap<>();
+        fila.put("clienteId", clienteId);
+        fila.put("motivo", motivo);
+        return fila;
+    }
 
     /** Departamento efectivo de un usuario, derivado de su campo/departamento o rol. */
     private String departamentoDe(Usuario usuario) {

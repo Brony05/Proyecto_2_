@@ -3,6 +3,8 @@ let departamentoActual = '';
 let miEquipo = [];
 let asigProfesionalSeleccionado = null;
 let asigPacienteSeleccionado = null;
+let huerfanosCache = [];
+let seleccionHuerfanos = new Set();
 
 // ==================== JEFE - INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
@@ -53,6 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Eventos de asignaciones
     document.getElementById('asigProfesional')?.addEventListener('change', seleccionarProfesionalAsig);
     document.getElementById('asigBuscarPaciente')?.addEventListener('input', cargarListadoPacientesAsig);
+    document.getElementById('loteProfesional')?.addEventListener('change', actualizarBotonLote);
     
     // Eventos de filtros
     document.getElementById('filtroFechaJefe')?.addEventListener('change', cargarCitasJefe);
@@ -255,6 +258,7 @@ async function cancelarCitaJefe(id) {
 async function iniciarTabAsignaciones() {
     await cargarProfesionalesAsig();
     await cargarListadoPacientesAsig();
+    await cargarHuerfanos();
     await cargarAsignacionesEquipo();
 }
 
@@ -270,6 +274,12 @@ async function cargarProfesionalesAsig() {
         const select = document.getElementById('asigProfesional');
         select.innerHTML = '<option value="">Seleccionar profesional</option>' +
             equipo.map(u => `<option value="${u.id}">${u.nombreCompleto || u.username} (${u.especialidad || u.rol})</option>`).join('');
+
+        const selectLote = document.getElementById('loteProfesional');
+        if (selectLote) {
+            selectLote.innerHTML = '<option value="">Seleccionar profesional</option>' +
+                equipo.map(u => `<option value="${u.id}">${u.nombreCompleto || u.username} (${u.especialidad || u.rol})</option>`).join('');
+        }
     } catch(e) { console.error(e); }
 }
 
@@ -384,6 +394,97 @@ async function liberarAsignacion(id) {
             await cargarAsignacionesEquipo();
         } else {
             mostrarMensaje('Error al liberar', 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
+}
+
+// ==================== JEFE - PACIENTES SIN PROFESIONAL (SC-05) ====================
+async function cargarHuerfanos() {
+    const contenedor = document.getElementById('listaHuerfanos');
+    if (!contenedor) return;
+    try {
+        const res = await authFetch('/api/asignaciones/huerfanos');
+        if (!res.ok) {
+            contenedor.innerHTML = '<span class="text-danger">No se pudo cargar la bandeja de pacientes sin profesional.</span>';
+            return;
+        }
+        huerfanosCache = await res.json();
+        // Conserva solo las selecciones que siguen sin profesional
+        const vigentes = new Set(huerfanosCache.map(p => p.id));
+        Array.from(seleccionHuerfanos).forEach(id => { if (!vigentes.has(id)) seleccionHuerfanos.delete(id); });
+        renderHuerfanos();
+    } catch(e) {
+        console.error(e);
+        contenedor.innerHTML = '<span class="text-danger">Error de conexión al cargar la bandeja.</span>';
+    }
+}
+
+function renderHuerfanos() {
+    const contenedor = document.getElementById('listaHuerfanos');
+    const contador = document.getElementById('contadorHuerfanos');
+    if (contador) contador.innerText = huerfanosCache.length;
+    if (!contenedor) return;
+    if (huerfanosCache.length === 0) {
+        contenedor.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Todos los pacientes tienen un profesional asignado.</span>';
+        actualizarBotonLote();
+        return;
+    }
+    contenedor.innerHTML = huerfanosCache.map(p => `
+        <div class="form-check border-bottom py-2">
+            <input class="form-check-input" type="checkbox" id="huerfano-${p.id}"
+                   ${seleccionHuerfanos.has(p.id) ? 'checked' : ''}
+                   onchange="toggleHuerfano(${p.id}, this.checked)">
+            <label class="form-check-label" for="huerfano-${p.id}">
+                <strong>${p.nombre}</strong>
+                <small class="text-muted d-block">${p.correo || ''}${p.telefono ? ' · ' + p.telefono : ''}</small>
+            </label>
+        </div>
+    `).join('');
+    actualizarBotonLote();
+}
+
+function toggleHuerfano(id, marcado) {
+    if (marcado) seleccionHuerfanos.add(id); else seleccionHuerfanos.delete(id);
+    actualizarBotonLote();
+}
+
+function alternarTodosHuerfanos() {
+    if (huerfanosCache.length > 0 && seleccionHuerfanos.size === huerfanosCache.length) seleccionHuerfanos.clear();
+    else huerfanosCache.forEach(p => seleccionHuerfanos.add(p.id));
+    renderHuerfanos();
+}
+
+function actualizarBotonLote() {
+    const btn = document.getElementById('btnAsignarLote');
+    const select = document.getElementById('loteProfesional');
+    if (!btn) return;
+    btn.disabled = seleccionHuerfanos.size === 0 || !select || !select.value;
+}
+
+async function asignarHuerfanosLote() {
+    const select = document.getElementById('loteProfesional');
+    const usuarioId = select ? parseInt(select.value, 10) : NaN;
+    if (!usuarioId || seleccionHuerfanos.size === 0) return;
+    const cantidad = seleccionHuerfanos.size;
+    setLoading(true);
+    try {
+        const res = await authFetch('/api/asignaciones/lote', {
+            method: 'POST',
+            body: JSON.stringify({ usuarioId: usuarioId, clienteIds: Array.from(seleccionHuerfanos) })
+        });
+        if (res.ok) {
+            const r = await res.json();
+            const omitidos = (r.omitidos || []).length;
+            mostrarMensaje(`✅ ${r.asignados} de ${cantidad} pacientes asignados` + (omitidos ? ` · ${omitidos} omitidos` : ''));
+            seleccionHuerfanos.clear();
+            await cargarHuerfanos();
+            await cargarAsignacionesEquipo();
+        } else {
+            const texto = await res.text();
+            mostrarMensaje('❌ ' + (texto.slice(0, 140) || 'Error al asignar en lote'), 'danger');
         }
     } catch(e) {
         mostrarMensaje('Error de conexión', 'danger');
