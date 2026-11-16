@@ -1,12 +1,17 @@
 package mx.com.ubam.isc.apijwt.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,10 +26,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.aopalliance.intercept.MethodInvocation;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.Expression;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.access.expression.SecurityExpressionHandler;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.util.SimpleMethodInvocation;
 
 import mx.com.ubam.isc.apijwt.model.Asignacion;
 import mx.com.ubam.isc.apijwt.model.Cita;
@@ -48,6 +63,10 @@ import mx.com.ubam.isc.apijwt.service.CitaService;
  * lectura de notas) se comprobaban con curl; si alguien relajaba una condición,
  * nada fallaba. Estas pruebas fijan las reglas de propiedad en el código:
  * quien no es el paciente, ni su profesional, ni administración, no ve nada.
+ *
+ * La exportación de PDF es la excepción al patrón: su regla vive en un
+ * @PreAuthorize, que no se evalúa llamando al controlador de forma directa, así
+ * que ese caso se prueba a través de un proxy con seguridad de métodos activa.
  *
  * Son pruebas de unidad con repositorios simulados: no necesitan base de datos.
  */
@@ -84,7 +103,11 @@ class PermisosClinicosTest {
     }
 
     private void sesion(String username) {
-        Authentication auth = new UsernamePasswordAuthenticationToken(username, "n/a", List.of());
+        sesionCon(username, List.of());
+    }
+
+    private void sesionCon(String username, List<GrantedAuthority> permisos) {
+        Authentication auth = new UsernamePasswordAuthenticationToken(username, "n/a", permisos);
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
@@ -274,5 +297,50 @@ class PermisosClinicosTest {
 
         sesion("jefe.psicologia");
         assertEquals(200, asignacionController.asignacionesDePersona(29L).getStatusCode().value());
+    }
+
+    // ==================== EXPORTACIÓN DE PDF ====================
+
+    /**
+     * La regla del PDF vive en un @PreAuthorize, no en el cuerpo del método, así
+     * que llamar al controlador no la evalúa. Aquí se toma la anotación real y se
+     * evalúa con el mismo parser y contexto de Spring Security que usa el
+     * interceptor, de modo que un cambio en la lista de roles rompe la prueba.
+     * No cubre el cableado del interceptor: solo la regla declarada.
+     */
+    private boolean puedeExportarPdf(String... roles) throws Exception {
+        Method metodo = CitaController.class.getMethod("exportarPdf",
+                LocalDate.class, LocalDate.class, String.class, String.class,
+                jakarta.servlet.http.HttpServletResponse.class);
+
+        PreAuthorize regla = metodo.getAnnotation(PreAuthorize.class);
+        assertNotNull(regla, "exportarPdf debe declarar @PreAuthorize");
+
+        List<GrantedAuthority> permisos = new ArrayList<>();
+        for (String rol : roles) {
+            permisos.add(new SimpleGrantedAuthority(rol));
+        }
+        Authentication autenticacion = new UsernamePasswordAuthenticationToken("quien-sea", "n/a", permisos);
+
+        SecurityExpressionHandler<MethodInvocation> manejador = new DefaultMethodSecurityExpressionHandler();
+        MethodInvocation invocacion = new SimpleMethodInvocation(citaController, metodo,
+                new Object[]{ LocalDate.now().minusDays(7), LocalDate.now(), "todas", "Bearer token",
+                              new MockHttpServletResponse() });
+
+        EvaluationContext contexto = manejador.createEvaluationContext(autenticacion, invocacion);
+        Expression expresion = manejador.getExpressionParser().parseExpression(regla.value());
+        return Boolean.TRUE.equals(expresion.getValue(contexto, Boolean.class));
+    }
+
+    @Test
+    void soloAdministracionYDireccionExportanElPdf() throws Exception {
+        assertTrue(puedeExportarPdf("ROLE_ADMIN"), "ADMIN debe poder exportar");
+        assertTrue(puedeExportarPdf("ROLE_DIRECTOR"), "DIRECTOR debe poder exportar");
+
+        assertFalse(puedeExportarPdf("ROLE_PSICOLOGO"), "un psicólogo no exporta el historial completo");
+        assertFalse(puedeExportarPdf("ROLE_PSICOLOGO", "ROLE_ENFERMERO"), "sumar roles clínicos no habilita");
+        assertFalse(puedeExportarPdf("ROLE_PACIENTE"), "un paciente no exporta el historial");
+        assertFalse(puedeExportarPdf("ROLE_JEFE_PSICOLOGIA"), "el jefe de departamento tampoco");
+        assertFalse(puedeExportarPdf(), "sin permisos no se exporta");
     }
 }
