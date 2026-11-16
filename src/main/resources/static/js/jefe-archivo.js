@@ -196,6 +196,33 @@ async function verExpedientePaciente(pacienteId) {
                 : '<li class="list-group-item text-muted">Sin notas clínicas registradas</li>';
         }
         
+        // Historial de profesionales que atendieron al paciente (SC-06):
+        // las liberadas no se borran, así que se ve la secuencia completa.
+        let historialHtml = '';
+        const resHistorial = await authFetch(`/api/asignaciones/paciente/${pacienteId}/historial`).catch(() => null);
+        if (resHistorial && resHistorial.ok) {
+            const historial = await resHistorial.json();
+            historialHtml = historial.length
+                ? historial.map(h => `
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>${h.profesional || 'Profesional ' + (h.profesionalId || '')}</strong>
+                            <small class="text-muted"> · ${[h.profesionalRol, h.departamento].filter(Boolean).join(' · ')}</small>
+                            ${h.motivo ? `<br><small class="text-muted">${h.motivo}</small>` : ''}
+                        </div>
+                        <span class="text-end small">
+                            ${h.fechaInicio ? 'Desde ' + h.fechaInicio : ''}<br>
+                            ${h.activa
+                                ? '<span class="badge bg-success">Vigente</span>'
+                                : '<span class="badge bg-secondary">Liberada' + (h.fechaFin ? ' el ' + h.fechaFin : '') + '</span>'}
+                        </span>
+                    </li>
+                `).join('')
+                : '<li class="list-group-item text-muted">Sin asignaciones registradas</li>';
+        } else {
+            historialHtml = '<li class="list-group-item text-muted">No se pudo cargar el historial de profesionales</li>';
+        }
+
         const modalHtml = `
             <div class="modal fade" id="verExpedienteModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -208,6 +235,8 @@ async function verExpedientePaciente(pacienteId) {
                             <p><strong>Estado del expediente:</strong> ${badgeArchivo(expediente.estado)}</p>
                             <p><strong>Observaciones de archivo:</strong> ${expediente.observaciones || 'Ninguna'}</p>
                             <p><strong>Última actualización:</strong> ${expediente.fechaActualizacion ? new Date(expediente.fechaActualizacion).toLocaleString('es-MX') : 'N/A'}</p>
+                            <h6 class="mt-4">Historial de profesionales</h6>
+                            <ul class="list-group">${historialHtml}</ul>
                             <h6 class="mt-3">Notas clínicas del paciente</h6>
                             <ul class="list-group">${notasHtml}</ul>
                         </div>

@@ -247,6 +247,17 @@ public class AsignacionController {
         return ResponseEntity.ok(respuesta);
     }
 
+    // ==================== HISTORIAL DE ASIGNACIONES DE UN PACIENTE (SC-06) ====================
+    /** Todo lo que ha pasado con el paciente: quién lo atendió y cuándo se liberó. */
+    @GetMapping("/paciente/{clienteId}/historial")
+    public ResponseEntity<?> historialDePaciente(@PathVariable Long clienteId) {
+        List<Map<String, Object>> salida = new ArrayList<>();
+        for (Asignacion asignacion : asignacionRepository.findByClienteIdOrderByFechaInicioDesc(clienteId)) {
+            salida.add(datosDeAsignacion(asignacion));
+        }
+        return ResponseEntity.ok(salida);
+    }
+
     // ==================== LIBERAR ASIGNACION (baja lógica) ====================
     @DeleteMapping("/{id}")
     @PreAuthorize(PERMISO_GESTION)
@@ -292,6 +303,24 @@ public class AsignacionController {
         Map<String, Object> fila = new HashMap<>();
         fila.put("clienteId", clienteId);
         fila.put("motivo", motivo);
+        return fila;
+    }
+
+    private Map<String, Object> datosDeAsignacion(Asignacion asignacion) {
+        Map<String, Object> fila = new HashMap<>();
+        fila.put("id", asignacion.getId());
+        fila.put("departamento", asignacion.getDepartamento());
+        fila.put("fechaInicio", asignacion.getFechaInicio());
+        fila.put("fechaFin", asignacion.getFechaFin());
+        fila.put("activa", asignacion.isActiva());
+        fila.put("motivo", asignacion.getMotivo());
+        if (asignacion.getUsuario() != null) {
+            Usuario profesional = asignacion.getUsuario();
+            fila.put("profesionalId", profesional.getId());
+            fila.put("profesional", profesional.getNombreCompleto() != null && !profesional.getNombreCompleto().isEmpty()
+                    ? profesional.getNombreCompleto() : profesional.getUsername());
+            fila.put("profesionalRol", profesional.getRol());
+        }
         return fila;
     }
 
