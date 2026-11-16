@@ -18,6 +18,7 @@ import mx.com.ubam.isc.apijwt.repository.DerivacionRepository;
 import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.service.AuditoriaService;
 import mx.com.ubam.isc.apijwt.service.CitaService;
+import mx.com.ubam.isc.apijwt.service.AvisoDerivacionService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,6 +59,7 @@ public class DerivacionController {
     @Autowired private CitaRepository citaRepository;
     @Autowired private CitaService citaService;
     @Autowired private AuditoriaService auditoriaService;
+    @Autowired private AvisoDerivacionService avisoDerivacionService;
 
     // ==================== CREAR SOLICITUD ====================
     @PostMapping
@@ -121,6 +123,13 @@ public class DerivacionController {
 
             auditoriaService.registrar(actor.getUsername(), "DERIVACION_SOLICITADA",
                 "Derivación del paciente '" + cliente.getNombre() + "' de " + origen + " a " + destino);
+
+            // Aviso por correo al jefe destino (SC-07): best-effort, no bloquea la respuesta.
+            try {
+                avisoDerivacionService.avisar(origen, destino, cliente, motivo, actor);
+            } catch (Exception e) {
+                System.err.println("No se pudo enviar el aviso de derivación: " + e.getMessage());
+            }
 
             return ResponseEntity.ok(guardada);
         } catch (Exception e) {
