@@ -33,6 +33,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Obtener departamento del jefe
     obtenerDepartamentoJefe();
+
+    // Contador de derivaciones pendientes en la pestaña (SC-07)
+    actualizarBadgeDerivaciones();
+    setInterval(actualizarBadgeDerivaciones, 60000);
     
     // Tabs
     document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -504,6 +508,27 @@ function etiquetaDepto(departamento) {
     return NOMBRES_DEPTO[departamento] || departamento || '-';
 }
 
+/**
+ * Contador visible de derivaciones pendientes: el jefe se enteraba solo al
+ * entrar a la bandeja. Ahora el número vive en la pestaña.
+ */
+function marcarBadgeDerivaciones(lista) {
+    const badge = document.getElementById('badgeDerivaciones');
+    if (!badge) return;
+    const pendientes = (lista || []).filter(d => d.estado === 'PENDIENTE').length;
+    badge.innerText = pendientes;
+    badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
+    badge.title = pendientes === 1 ? '1 derivación pendiente' : pendientes + ' derivaciones pendientes';
+}
+
+async function actualizarBadgeDerivaciones() {
+    try {
+        const res = await authFetch('/api/derivaciones/equipo');
+        if (!res.ok) return;
+        marcarBadgeDerivaciones(await res.json());
+    } catch(e) { /* sin conexión: se reintenta en el siguiente ciclo */ }
+}
+
 function badgeEstadoDerivacion(estado) {
     if (estado === 'APROBADA') return '<span class="badge bg-success">Aprobada</span>';
     if (estado === 'RECHAZADA') return '<span class="badge bg-danger">Rechazada</span>';
@@ -520,6 +545,7 @@ async function cargarDerivacionesEquipo() {
             return;
         }
         derivacionesCache = await res.json();
+        marcarBadgeDerivaciones(derivacionesCache);
         if (!derivacionesCache.length) {
             cuerpo.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin derivaciones para tu departamento</td></tr>';
             return;
