@@ -47,173 +47,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ==================== PSIQUIATRA - DASHBOARD ====================
 async function cargarDashboardPsiquiatra() {
-    setLoading(true);
-    try {
-        const username = localStorage.getItem('username');
-        const resUsuarios = await authFetch('/api/usuarios');
-        if (resUsuarios.ok) {
-            const usuarios = await resUsuarios.json();
-            const yo = usuarios.find(u => u.username === username);
-            
-            const resCitas = await authFetch('/api/citas');
-            if (resCitas.ok) {
-                const todasCitas = await resCitas.json();
-                const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-                
-                const hoy = new Date().toISOString().split('T')[0];
-                const citasHoy = misCitas.filter(c => c.fecha === hoy && c.estado !== 'CANCELADA').length;
-                const citasProgreso = misCitas.filter(c => c.estado === 'EN_PROGRESO').length;
-                const citasCompletadas = misCitas.filter(c => c.estado === 'COMPLETADA').length;
-                
-                document.getElementById('citasHoy').innerText = citasHoy;
-                document.getElementById('citasProgreso').innerText = citasProgreso;
-                document.getElementById('citasCompletadas').innerText = citasCompletadas;
-                
-                const pacientesIds = new Set(misCitas.map(c => c.cliente?.id));
-                document.getElementById('totalPacientes').innerText = pacientesIds.size;
-                
-                const proximas = misCitas.filter(c => c.fecha >= hoy && c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA').slice(0, 10);
-                document.getElementById('tbodyProximasCitasPsiquiatra').innerHTML = proximas.map(c => `
-                    <tr>
-                        <td>${c.fecha || 'N/A'}</td>
-                        <td>${c.hora || 'N/A'}</td>
-                        <td>${c.cliente?.nombre || 'N/A'}</td>
-                        <td>${c.servicio || 'N/A'}</td>
-                        <td>${obtenerBadgeEstado(c.estado)}</td>
-                        <td><button class="btn btn-sm btn-success" onclick="iniciarCitaPsiquiatra(${c.id})">Iniciar</button></td>
-                    </tr>
-                `).join('');
-                
-                // Gráficas del panel una vez que ya tenemos misCitas
-                await dibujarGraficasClinicas(misCitas);
-            }
-        }
-    } catch(e) { console.error(e); }
-    setLoading(false);
+    return cargarDashboardClinico('Psiquiatra');
 }
 
 // ==================== PSIQUIATRA - CITAS ====================
 async function cargarCitasPsiquiatra() {
-    setLoading(true);
-    try {
-        const username = localStorage.getItem('username');
-        const resUsuarios = await authFetch('/api/usuarios');
-        if (resUsuarios.ok) {
-            const usuarios = await resUsuarios.json();
-            const yo = usuarios.find(u => u.username === username);
-            
-            const resCitas = await authFetch('/api/citas');
-            if (resCitas.ok) {
-                let citas = await resCitas.json();
-                citas = citas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-                
-                const fechaFiltro = document.getElementById('filtroFechaPsiquiatra')?.value;
-                const estadoFiltro = document.getElementById('filtroEstadoPsiquiatra')?.value;
-                
-                if (fechaFiltro) citas = citas.filter(c => c.fecha === fechaFiltro);
-                if (estadoFiltro) citas = citas.filter(c => c.estado === estadoFiltro);
-                
-                document.getElementById('tbodyCitasPsiquiatra').innerHTML = citas.map(c => `
-                    <tr>
-                        <td>${c.id}</td>
-                        <td>${c.fecha || 'N/A'}</td>
-                        <td>${c.hora || 'N/A'}</td>
-                        <td>${c.cliente?.nombre || 'N/A'}</td>
-                        <td>${c.servicio || 'N/A'}</td>
-                        <td>${obtenerBadgeEstado(c.estado)}</td>
-                        <td>
-                            ${c.estado === 'AGENDADA' ? `<button class="btn btn-sm btn-success" onclick="iniciarCitaPsiquiatra(${c.id})">Iniciar</button>` : ''}
-                            ${c.estado === 'EN_PROGRESO' ? `<button class="btn btn-sm btn-warning" onclick="completarCitaPsiquiatra(${c.id})">Completar</button>` : ''}
-                            ${c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA' ? `<button class="btn btn-sm btn-danger" onclick="cancelarCitaPsiquiatra(${c.id})">Cancelar</button>` : ''}
-                        </td>
-                    </tr>
-                `).join('');
-            }
-        }
-    } catch(e) { console.error(e); }
-    setLoading(false);
+    return cargarCitasClinico('Psiquiatra');
 }
 
 async function iniciarCitaPsiquiatra(id) {
-    if (confirm('¿Iniciar esta cita?')) {
-        setLoading(true);
-        try {
-            const res = await authFetch(`/api/citas/${id}/estado?estado=EN_PROGRESO`, { method: 'PUT' });
-            if (res.ok) {
-                cargarCitasPsiquiatra();
-                cargarDashboardPsiquiatra();
-                mostrarMensaje('✅ Cita iniciada');
-            }
-        } catch(e) { mostrarMensaje('Error', 'danger'); }
-        setLoading(false);
-    }
+    return cambiarEstadoCitaClinico({
+        id, sufijo: 'Psiquiatra', url: `/api/citas/${id}/estado?estado=EN_PROGRESO`,
+        confirmacion: '¿Iniciar esta cita?', mensaje: '✅ Cita iniciada'
+    });
 }
 
 async function completarCitaPsiquiatra(id) {
-    if (confirm('¿Marcar como completada?')) {
-        setLoading(true);
-        try {
-            const res = await authFetch(`/api/citas/${id}/estado?estado=COMPLETADA`, { method: 'PUT' });
-            if (res.ok) {
-                cargarCitasPsiquiatra();
-                cargarDashboardPsiquiatra();
-                mostrarMensaje('✅ Cita completada');
-            }
-        } catch(e) { mostrarMensaje('Error', 'danger'); }
-        setLoading(false);
-    }
+    return cambiarEstadoCitaClinico({
+        id, sufijo: 'Psiquiatra', url: `/api/citas/${id}/estado?estado=COMPLETADA`,
+        confirmacion: '¿Marcar esta cita como completada?', mensaje: '✅ Cita completada'
+    });
 }
 
 async function cancelarCitaPsiquiatra(id) {
-    if (confirm('¿Cancelar esta cita?')) {
-        setLoading(true);
-        try {
-            const res = await authFetch(`/api/citas/${id}/cancelar`, { method: 'PUT' });
-            if (res.ok) {
-                cargarCitasPsiquiatra();
-                cargarDashboardPsiquiatra();
-                mostrarMensaje('✅ Cita cancelada');
-            }
-        } catch(e) { mostrarMensaje('Error', 'danger'); }
-        setLoading(false);
-    }
+    return cambiarEstadoCitaClinico({
+        id, sufijo: 'Psiquiatra', url: `/api/citas/${id}/cancelar`,
+        confirmacion: '¿Cancelar esta cita?', mensaje: '✅ Cita cancelada'
+    });
 }
 
 // ==================== PSIQUIATRA - PACIENTES ====================
 // ==================== PSIQUIATRA - PACIENTES ====================
 // Pacientes del psiquiatra: primero asignaciones activas, luego criterio de citas.
 async function obtenerPacientesPsiquiatra() {
-    const username = localStorage.getItem('username');
-    try {
-        const res = await authFetch('/api/asignaciones/mias');
-        if (res.ok) {
-            const asigs = await res.json();
-            if (Array.isArray(asigs)) {
-                const unicos = new Map();
-                asigs.map(a => a.cliente).filter(Boolean).forEach(c => unicos.set(c.id, c));
-                if (unicos.size > 0) return [...unicos.values()];
-            }
-        }
-    } catch(e) { console.error(e); }
-    // Fallback: pacientes con citas propias
-    const resUsuarios = await authFetch('/api/usuarios').catch(() => null);
-    let yo = null;
-    if (resUsuarios && resUsuarios.ok) {
-        const usuarios = await resUsuarios.json();
-        yo = usuarios.find(u => u.username === username);
-    }
-    const resCitas = await authFetch('/api/citas').catch(() => null);
-    if (resCitas && resCitas.ok) {
-        const todasCitas = await resCitas.json();
-        const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-        const pacientesIds = [...new Set(misCitas.map(c => c.cliente?.id))];
-        const resPacientes = await authFetch('/api/clientes').catch(() => null);
-        if (resPacientes && resPacientes.ok) {
-            const pacientes = await resPacientes.json();
-            return pacientes.filter(p => pacientesIds.includes(p.id));
-        }
-    }
-    return [];
+    return obtenerPacientesClinico();
 }
 
 // Carga el módulo compartido de derivaciones (botón "Derivar" de la tabla)
@@ -446,87 +313,17 @@ async function cargarPacientesNotaPsiquiatra() {
 }
 
 function seleccionarPacienteNotaPsiquiatra(id, nombre) {
-    pacienteSeleccionadoIdPsiquiatra = id;
-    document.getElementById('notaPacienteIdPsiquiatra').value = id;
-    document.getElementById('pacienteSeleccionadoNombrePsiquiatra').innerHTML = nombre;
-    document.getElementById('pacienteSeleccionadoInfoPsiquiatra').style.display = 'block';
-    document.getElementById('btnGuardarNotaPsiquiatra').disabled = false;
-    
-    document.getElementById('notaTipoPsiquiatra').value = '';
-    document.getElementById('notaContenidoPsiquiatra').value = '';
-    
-    cargarNotasPacientePsiquiatra(id);
+    return seleccionarPacienteNotaClinico({ sufijo: 'Psiquiatra', id, nombre, alSeleccionar: (v) => { pacienteSeleccionadoIdPsiquiatra = v; } });
 }
 
 async function cargarNotasPacientePsiquiatra(pacienteId) {
-    setLoading(true);
-    try {
-        const res = await authFetch(`/api/notas/doctor/paciente/${pacienteId}`);
-        if (res.ok) {
-            const notas = await res.json();
-            const container = document.getElementById('notasPacienteContainerPsiquiatra');
-            if (notas.length === 0) {
-                container.innerHTML = '<div class="alert alert-info">No hay notas para este paciente.</div>';
-            } else {
-                container.innerHTML = notas.map(n => `
-                    <div class="nota-card">
-                        <div class="d-flex justify-content-between">
-                            <strong class="text-primary">${n.tipo}:</strong>
-                            <small class="text-muted">${new Date(n.fechaCreacion).toLocaleString()}</small>
-                        </div>
-                        <p class="mt-2 mb-0">${n.diagnostico || n.recomendaciones || n.medicamentos || ''}</p>
-                        <hr class="my-2">
-                        <small class="text-muted">Dr. ${n.doctor?.nombreCompleto || n.doctor?.username || 'Desconocido'}</small>
-                    </div>
-                `).join('');
-            }
-        }
-    } catch(e) { console.error(e); }
-    setLoading(false);
+    return cargarNotasPacienteClinico('Psiquiatra', pacienteId);
 }
 
 async function guardarNotaPsiquiatra() {
-    const pacienteId = document.getElementById('notaPacienteIdPsiquiatra').value;
-    const tipo = document.getElementById('notaTipoPsiquiatra').value;
-    const contenido = document.getElementById('notaContenidoPsiquiatra').value;
-    
-    if (!pacienteId) {
-        mostrarMensaje('❌ Selecciona un paciente', 'danger');
-        return;
-    }
-    if (!tipo) {
-        mostrarMensaje('❌ Selecciona un tipo de nota', 'danger');
-        return;
-    }
-    if (!contenido) {
-        mostrarMensaje('❌ Escribe el contenido', 'danger');
-        return;
-    }
-    
-    setLoading(true);
-    try {
-        let payload = { pacienteId: parseInt(pacienteId), tipo: tipo };
-        if (tipo === 'DIAGNOSTICO') payload.diagnostico = contenido;
-        else if (tipo === 'RECOMENDACION' || tipo === 'CONSEJO' || tipo === 'OBSERVACION' || tipo === 'EVOLUCION') {
-            payload.recomendaciones = contenido;
-        }
-        
-        const res = await authFetch('/api/notas', { method: 'POST', body: JSON.stringify(payload) });
-        if (res.ok) {
-            document.getElementById('notaContenidoPsiquiatra').value = '';
-            document.getElementById('notaTipoPsiquiatra').value = '';
-            await cargarNotasPacientePsiquiatra(parseInt(pacienteId));
-            mostrarMensaje('✅ Nota guardada', 'success');
-        } else {
-            mostrarMensaje('Error al guardar', 'danger');
-        }
-    } catch(e) {
-        mostrarMensaje('Error de conexión', 'danger');
-    }
-    setLoading(false);
+    return guardarNotaClinico({ sufijo: 'Psiquiatra', tiposRecomendacion: ['RECOMENDACION', 'CONSEJO', 'OBSERVACION', 'EVOLUCION'] });
 }
 
 function verNotasPacientePsiquiatra(id, nombre) {
-    seleccionarPacienteNotaPsiquiatra(id, nombre);
-    document.querySelector('[data-tab="notas"]').click();
+    return verNotasPacienteClinico({ sufijo: 'Psiquiatra', id, nombre, alSeleccionar: (v) => { pacienteSeleccionadoIdPsiquiatra = v; } });
 }

@@ -190,3 +190,237 @@ function obtenerBadgeEstado(estado) {
     };
     return estados[estado] || '<span class="badge-estado badge-agendada">Agendada</span>';
 }
+
+// ==================== VISTAS CLÍNICAS COMPARTIDAS (SC-09) ====================
+// Psicología y psiquiatría eran el mismo código con el nombre del rol cambiado.
+// Todo lo de aquí abajo se arregla una vez y sirve a las dos vistas.
+
+async function cargarCitasClinico(sufijo) {
+    setLoading(true);
+    try {
+        const username = localStorage.getItem('username');
+        const resUsuarios = await authFetch('/api/usuarios');
+        if (resUsuarios.ok) {
+            const usuarios = await resUsuarios.json();
+            const yo = usuarios.find(u => u.username === username);
+
+            const resCitas = await authFetch('/api/citas');
+            if (resCitas.ok) {
+                let citas = await resCitas.json();
+                citas = citas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
+
+                const fechaFiltro = document.getElementById('filtroFecha' + sufijo)?.value;
+                const estadoFiltro = document.getElementById('filtroEstado' + sufijo)?.value;
+
+                if (fechaFiltro) citas = citas.filter(c => c.fecha === fechaFiltro);
+                if (estadoFiltro) citas = citas.filter(c => c.estado === estadoFiltro);
+
+                document.getElementById('tbodyCitas' + sufijo).innerHTML = citas.map(c => `
+                    <tr>
+                        <td>${c.id}</td>
+                        <td>${c.fecha || 'N/A'}</td>
+                        <td>${c.hora || 'N/A'}</td>
+                        <td>${c.cliente?.nombre || 'N/A'}</td>
+                        <td>${c.servicio || 'N/A'}</td>
+                        <td>${obtenerBadgeEstado(c.estado)}</td>
+                        <td>
+                            ${c.estado === 'AGENDADA' ? `<button class="btn btn-sm btn-success" onclick="iniciarCita${sufijo}(${c.id})">Iniciar</button>` : ''}
+                            ${c.estado === 'EN_PROGRESO' ? `<button class="btn btn-sm btn-warning" onclick="completarCita${sufijo}(${c.id})">Completar</button>` : ''}
+                            ${c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA' ? `<button class="btn btn-sm btn-danger" onclick="cancelarCita${sufijo}(${c.id})">Cancelar</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+    } catch(e) { console.error(e); }
+    setLoading(false);
+}
+
+async function cambiarEstadoCitaClinico(cfg) {
+    if (confirm(cfg.confirmacion)) {
+        setLoading(true);
+        try {
+            const res = await authFetch(cfg.url, { method: 'PUT' });
+            if (res.ok) {
+                window['cargarCitas' + cfg.sufijo]();
+                window['cargarDashboard' + cfg.sufijo]();
+                mostrarMensaje(cfg.mensaje);
+            } else {
+                mostrarMensaje('Error', 'danger');
+            }
+        } catch(e) {
+            mostrarMensaje('Error de conexión', 'danger');
+        }
+        setLoading(false);
+    }
+}
+
+// Los pacientes del clínico salen de sus ASIGNACIONES activas; si la clínica
+// todavía los rastrea solo por citas, cae al criterio anterior.
+async function obtenerPacientesClinico() {
+    const username = localStorage.getItem('username');
+    try {
+        const res = await authFetch('/api/asignaciones/mias');
+        if (res.ok) {
+            const asigs = await res.json();
+            if (Array.isArray(asigs)) {
+                const clientes = asigs.map(a => a.cliente).filter(Boolean);
+                const unicos = new Map();
+                clientes.forEach(c => unicos.set(c.id, c));
+                if (unicos.size > 0) return [...unicos.values()];
+            }
+        }
+    } catch(e) { console.error(e); }
+
+    const resUsuarios = await authFetch('/api/usuarios').catch(() => null);
+    let yo = null;
+    if (resUsuarios && resUsuarios.ok) {
+        const usuarios = await resUsuarios.json();
+        yo = usuarios.find(u => u.username === username);
+    }
+    const resCitas = await authFetch('/api/citas').catch(() => null);
+    if (resCitas && resCitas.ok) {
+        const todasCitas = await resCitas.json();
+        const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
+        const pacientesIds = [...new Set(misCitas.map(c => c.cliente?.id))];
+        const resPacientes = await authFetch('/api/clientes').catch(() => null);
+        if (resPacientes && resPacientes.ok) {
+            const pacientes = await resPacientes.json();
+            return pacientes.filter(p => pacientesIds.includes(p.id));
+        }
+    }
+    return [];
+}
+
+function seleccionarPacienteNotaClinico(cfg) {
+    cfg.alSeleccionar(cfg.id);
+    document.getElementById('notaPacienteId' + cfg.sufijo).value = cfg.id;
+    document.getElementById('pacienteSeleccionadoNombre' + cfg.sufijo).innerHTML = cfg.nombre;
+    document.getElementById('pacienteSeleccionadoInfo' + cfg.sufijo).style.display = 'block';
+    document.getElementById('btnGuardarNota' + cfg.sufijo).disabled = false;
+
+    document.getElementById('notaTipo' + cfg.sufijo).value = '';
+    document.getElementById('notaContenido' + cfg.sufijo).value = '';
+
+    cargarNotasPacienteClinico(cfg.sufijo, cfg.id);
+}
+
+async function cargarNotasPacienteClinico(sufijo, pacienteId) {
+    setLoading(true);
+    try {
+        const res = await authFetch(`/api/notas/doctor/paciente/${pacienteId}`);
+        if (res.ok) {
+            const notas = await res.json();
+            const container = document.getElementById('notasPacienteContainer' + sufijo);
+            if (notas.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No hay notas para este paciente.</div>';
+            } else {
+                container.innerHTML = notas.map(n => `
+                    <div class="nota-card">
+                        <div class="d-flex justify-content-between">
+                            <strong class="text-primary">${n.tipo}:</strong>
+                            <small class="text-muted">${new Date(n.fechaCreacion).toLocaleString()}</small>
+                        </div>
+                        <p class="mt-2 mb-0">${n.diagnostico || n.recomendaciones || n.medicamentos || ''}</p>
+                        <hr class="my-2">
+                        <small class="text-muted">Dr. ${n.doctor?.nombreCompleto || n.doctor?.username || 'Desconocido'}</small>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch(e) { console.error(e); }
+    setLoading(false);
+}
+
+function verNotasPacienteClinico(cfg) {
+    seleccionarPacienteNotaClinico(cfg);
+    document.querySelector('[data-tab="notas"]').click();
+}
+
+async function guardarNotaClinico(cfg) {
+    const pacienteId = document.getElementById('notaPacienteId' + cfg.sufijo).value;
+    const tipo = document.getElementById('notaTipo' + cfg.sufijo).value;
+    const contenido = document.getElementById('notaContenido' + cfg.sufijo).value;
+
+    if (!pacienteId) {
+        mostrarMensaje('❌ Selecciona un paciente', 'danger');
+        return;
+    }
+    if (!tipo) {
+        mostrarMensaje('❌ Selecciona un tipo de nota', 'danger');
+        return;
+    }
+    if (!contenido) {
+        mostrarMensaje('❌ Escribe el contenido', 'danger');
+        return;
+    }
+
+    setLoading(true);
+    try {
+        let payload = { pacienteId: parseInt(pacienteId), tipo: tipo };
+        const tiposRecomendacion = cfg.tiposRecomendacion || ['RECOMENDACION', 'CONSEJO', 'OBSERVACION'];
+        if (tipo === 'DIAGNOSTICO') payload.diagnostico = contenido;
+        else if (tiposRecomendacion.includes(tipo)) payload.recomendaciones = contenido;
+
+        const res = await authFetch('/api/notas', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) {
+            document.getElementById('notaContenido' + cfg.sufijo).value = '';
+            document.getElementById('notaTipo' + cfg.sufijo).value = '';
+            await cargarNotasPacienteClinico(cfg.sufijo, parseInt(pacienteId));
+            mostrarMensaje('✅ Nota guardada', 'success');
+        } else {
+            mostrarMensaje('Error al guardar', 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
+}
+
+async function cargarDashboardClinico(sufijo) {
+    setLoading(true);
+    try {
+        const username = localStorage.getItem('username');
+        const resUsuarios = await authFetch('/api/usuarios');
+        if (resUsuarios.ok) {
+            const usuarios = await resUsuarios.json();
+            const yo = usuarios.find(u => u.username === username);
+
+            const resCitas = await authFetch('/api/citas');
+            if (resCitas.ok) {
+                const todasCitas = await resCitas.json();
+                const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
+
+                const hoy = new Date().toISOString().split('T')[0];
+                const citasHoy = misCitas.filter(c => c.fecha === hoy && c.estado !== 'CANCELADA').length;
+                const citasProgreso = misCitas.filter(c => c.estado === 'EN_PROGRESO').length;
+                const citasCompletadas = misCitas.filter(c => c.estado === 'COMPLETADA').length;
+
+                document.getElementById('citasHoy').innerText = citasHoy;
+                document.getElementById('citasProgreso').innerText = citasProgreso;
+                document.getElementById('citasCompletadas').innerText = citasCompletadas;
+
+                const pacientesIds = new Set(misCitas.map(c => c.cliente?.id));
+                document.getElementById('totalPacientes').innerText = pacientesIds.size;
+
+                const proximas = misCitas.filter(c => c.fecha >= hoy && c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA').slice(0, 10);
+                document.getElementById('tbodyProximasCitas' + sufijo).innerHTML = proximas.map(c => `
+                    <tr>
+                        <td>${c.fecha || 'N/A'}</td>
+                        <td>${c.hora || 'N/A'}</td>
+                        <td>${c.cliente?.nombre || 'N/A'}</td>
+                        <td>${c.servicio || 'N/A'}</td>
+                        <td>${obtenerBadgeEstado(c.estado)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-success" onclick="iniciarCita${sufijo}(${c.id})">Iniciar</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Gráficas del panel una vez que ya tenemos misCitas
+                await dibujarGraficasClinicas(misCitas);
+            }
+        }
+    } catch(e) { console.error(e); }
+    setLoading(false);
+}

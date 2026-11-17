@@ -43,152 +43,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ==================== PSICÓLOGO - DASHBOARD ====================
 async function cargarDashboardPsicologo() {
-    setLoading(true);
-    try {
-        const username = localStorage.getItem('username');
-        const resUsuarios = await authFetch('/api/usuarios');
-        if (resUsuarios.ok) {
-            const usuarios = await resUsuarios.json();
-            const yo = usuarios.find(u => u.username === username);
-            
-            const resCitas = await authFetch('/api/citas');
-            if (resCitas.ok) {
-                const todasCitas = await resCitas.json();
-                const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-                
-                const hoy = new Date().toISOString().split('T')[0];
-                const citasHoy = misCitas.filter(c => c.fecha === hoy && c.estado !== 'CANCELADA').length;
-                const citasProgreso = misCitas.filter(c => c.estado === 'EN_PROGRESO').length;
-                const citasCompletadas = misCitas.filter(c => c.estado === 'COMPLETADA').length;
-                
-                document.getElementById('citasHoy').innerText = citasHoy;
-                document.getElementById('citasProgreso').innerText = citasProgreso;
-                document.getElementById('citasCompletadas').innerText = citasCompletadas;
-                
-                // Pacientes únicos
-                const pacientesIds = new Set(misCitas.map(c => c.cliente?.id));
-                document.getElementById('totalPacientes').innerText = pacientesIds.size;
-                
-                // Próximas citas
-                const proximas = misCitas.filter(c => c.fecha >= hoy && c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA').slice(0, 10);
-                document.getElementById('tbodyProximasCitasPsicologo').innerHTML = proximas.map(c => `
-                    <tr>
-                        <td>${c.fecha || 'N/A'}</td>
-                        <td>${c.hora || 'N/A'}</td>
-                        <td>${c.cliente?.nombre || 'N/A'}</td>
-                        <td>${c.servicio || 'N/A'}</td>
-                        <td>${obtenerBadgeEstado(c.estado)}</td>
-                        <td>
-                            <button class="btn btn-sm btn-success" onclick="iniciarCitaPsicologo(${c.id})">Iniciar</button>
-                        </td>
-                    </tr>
-                `).join('');
-                
-                // Gráficas del panel una vez que ya tenemos misCitas
-                await dibujarGraficasClinicas(misCitas);
-            }
-        }
-    } catch(e) { console.error(e); }
-    setLoading(false);
+    return cargarDashboardClinico('Psicologo');
 }
 
 // ==================== PSICÓLOGO - CITAS ====================
 async function cargarCitasPsicologo() {
-    setLoading(true);
-    try {
-        const username = localStorage.getItem('username');
-        const resUsuarios = await authFetch('/api/usuarios');
-        if (resUsuarios.ok) {
-            const usuarios = await resUsuarios.json();
-            const yo = usuarios.find(u => u.username === username);
-            
-            const resCitas = await authFetch('/api/citas');
-            if (resCitas.ok) {
-                let citas = await resCitas.json();
-                citas = citas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-                
-                const fechaFiltro = document.getElementById('filtroFechaPsicologo')?.value;
-                const estadoFiltro = document.getElementById('filtroEstadoPsicologo')?.value;
-                
-                if (fechaFiltro) citas = citas.filter(c => c.fecha === fechaFiltro);
-                if (estadoFiltro) citas = citas.filter(c => c.estado === estadoFiltro);
-                
-                document.getElementById('tbodyCitasPsicologo').innerHTML = citas.map(c => `
-                    <tr>
-                        <td>${c.id}</td>
-                        <td>${c.fecha || 'N/A'}</td>
-                        <td>${c.hora || 'N/A'}</td>
-                        <td>${c.cliente?.nombre || 'N/A'}</td>
-                        <td>${c.servicio || 'N/A'}</td>
-                        <td>${obtenerBadgeEstado(c.estado)}</td>
-                        <td>
-                            ${c.estado === 'AGENDADA' ? `<button class="btn btn-sm btn-success" onclick="iniciarCitaPsicologo(${c.id})">Iniciar</button>` : ''}
-                            ${c.estado === 'EN_PROGRESO' ? `<button class="btn btn-sm btn-warning" onclick="completarCitaPsicologo(${c.id})">Completar</button>` : ''}
-                            ${c.estado !== 'CANCELADA' && c.estado !== 'COMPLETADA' ? `<button class="btn btn-sm btn-danger" onclick="cancelarCitaPsicologo(${c.id})">Cancelar</button>` : ''}
-                        </td>
-                    </tr>
-                `).join('');
-            }
-        }
-    } catch(e) { console.error(e); }
-    setLoading(false);
+    return cargarCitasClinico('Psicologo');
 }
 
 async function iniciarCitaPsicologo(id) {
-    if (confirm('¿Iniciar esta cita?')) {
-        setLoading(true);
-        try {
-            const res = await authFetch(`/api/citas/${id}/estado?estado=EN_PROGRESO`, { method: 'PUT' });
-            if (res.ok) {
-                cargarCitasPsicologo();
-                cargarDashboardPsicologo();
-                mostrarMensaje('✅ Cita iniciada');
-            } else {
-                mostrarMensaje('Error', 'danger');
-            }
-        } catch(e) {
-            mostrarMensaje('Error de conexión', 'danger');
-        }
-        setLoading(false);
-    }
+    return cambiarEstadoCitaClinico({
+        id, sufijo: 'Psicologo', url: `/api/citas/${id}/estado?estado=EN_PROGRESO`,
+        confirmacion: '¿Iniciar esta cita?', mensaje: '✅ Cita iniciada'
+    });
 }
 
 async function completarCitaPsicologo(id) {
-    if (confirm('¿Marcar esta cita como completada?')) {
-        setLoading(true);
-        try {
-            const res = await authFetch(`/api/citas/${id}/estado?estado=COMPLETADA`, { method: 'PUT' });
-            if (res.ok) {
-                cargarCitasPsicologo();
-                cargarDashboardPsicologo();
-                mostrarMensaje('✅ Cita completada');
-            } else {
-                mostrarMensaje('Error', 'danger');
-            }
-        } catch(e) {
-            mostrarMensaje('Error de conexión', 'danger');
-        }
-        setLoading(false);
-    }
+    return cambiarEstadoCitaClinico({
+        id, sufijo: 'Psicologo', url: `/api/citas/${id}/estado?estado=COMPLETADA`,
+        confirmacion: '¿Marcar esta cita como completada?', mensaje: '✅ Cita completada'
+    });
 }
 
 async function cancelarCitaPsicologo(id) {
-    if (confirm('¿Cancelar esta cita?')) {
-        setLoading(true);
-        try {
-            const res = await authFetch(`/api/citas/${id}/cancelar`, { method: 'PUT' });
-            if (res.ok) {
-                cargarCitasPsicologo();
-                cargarDashboardPsicologo();
-                mostrarMensaje('✅ Cita cancelada');
-            } else {
-                mostrarMensaje('Error', 'danger');
-            }
-        } catch(e) {
-            mostrarMensaje('Error de conexión', 'danger');
-        }
-        setLoading(false);
-    }
+    return cambiarEstadoCitaClinico({
+        id, sufijo: 'Psicologo', url: `/api/citas/${id}/cancelar`,
+        confirmacion: '¿Cancelar esta cita?', mensaje: '✅ Cita cancelada'
+    });
 }
 
 // ==================== PSICÓLOGO - PACIENTES ====================
@@ -196,38 +77,7 @@ async function cancelarCitaPsicologo(id) {
 // Los pacientes del psicólogo salen de sus ASIGNACIONES activas; si la
 // clínica todavía los rastrea solo por citas, cae al criterio anterior.
 async function obtenerPacientesPsicologo() {
-    const username = localStorage.getItem('username');
-    try {
-        const res = await authFetch('/api/asignaciones/mias');
-        if (res.ok) {
-            const asigs = await res.json();
-            if (Array.isArray(asigs)) {
-                const clientes = asigs.map(a => a.cliente).filter(Boolean);
-                const unicos = new Map();
-                clientes.forEach(c => unicos.set(c.id, c));
-                if (unicos.size > 0) return [...unicos.values()];
-            }
-        }
-    } catch(e) { console.error(e); }
-    // Fallback: pacientes con citas propias
-    const resUsuarios = await authFetch('/api/usuarios').catch(() => null);
-    let yo = null;
-    if (resUsuarios && resUsuarios.ok) {
-        const usuarios = await resUsuarios.json();
-        yo = usuarios.find(u => u.username === username);
-    }
-    const resCitas = await authFetch('/api/citas').catch(() => null);
-    if (resCitas && resCitas.ok) {
-        const todasCitas = await resCitas.json();
-        const misCitas = todasCitas.filter(c => c.usuario?.username === username || c.usuario?.id === yo?.id);
-        const pacientesIds = [...new Set(misCitas.map(c => c.cliente?.id))];
-        const resPacientes = await authFetch('/api/clientes').catch(() => null);
-        if (resPacientes && resPacientes.ok) {
-            const pacientes = await resPacientes.json();
-            return pacientes.filter(p => pacientesIds.includes(p.id));
-        }
-    }
-    return [];
+    return obtenerPacientesClinico();
 }
 
 // Carga el módulo compartido de derivaciones (botón "Derivar" de la tabla)
@@ -306,85 +156,17 @@ async function cargarPacientesNotaPsicologo() {
 }
 
 function seleccionarPacienteNotaPsicologo(id, nombre) {
-    pacienteSeleccionadoIdPsicologo = id;
-    document.getElementById('notaPacienteIdPsicologo').value = id;
-    document.getElementById('pacienteSeleccionadoNombrePsicologo').innerHTML = nombre;
-    document.getElementById('pacienteSeleccionadoInfoPsicologo').style.display = 'block';
-    document.getElementById('btnGuardarNotaPsicologo').disabled = false;
-    
-    document.getElementById('notaTipoPsicologo').value = '';
-    document.getElementById('notaContenidoPsicologo').value = '';
-    
-    cargarNotasPacientePsicologo(id);
+    return seleccionarPacienteNotaClinico({ sufijo: 'Psicologo', id, nombre, alSeleccionar: (v) => { pacienteSeleccionadoIdPsicologo = v; } });
 }
 
 async function cargarNotasPacientePsicologo(pacienteId) {
-    setLoading(true);
-    try {
-        const res = await authFetch(`/api/notas/doctor/paciente/${pacienteId}`);
-        if (res.ok) {
-            const notas = await res.json();
-            const container = document.getElementById('notasPacienteContainerPsicologo');
-            if (notas.length === 0) {
-                container.innerHTML = '<div class="alert alert-info">No hay notas para este paciente.</div>';
-            } else {
-                container.innerHTML = notas.map(n => `
-                    <div class="nota-card">
-                        <div class="d-flex justify-content-between">
-                            <strong class="text-primary">${n.tipo}:</strong>
-                            <small class="text-muted">${new Date(n.fechaCreacion).toLocaleString()}</small>
-                        </div>
-                        <p class="mt-2 mb-0">${n.diagnostico || n.recomendaciones || n.medicamentos || ''}</p>
-                        <hr class="my-2">
-                        <small class="text-muted">Dr. ${n.doctor?.nombreCompleto || n.doctor?.username || 'Desconocido'}</small>
-                    </div>
-                `).join('');
-            }
-        }
-    } catch(e) { console.error(e); }
-    setLoading(false);
+    return cargarNotasPacienteClinico('Psicologo', pacienteId);
 }
 
 async function guardarNotaPsicologo() {
-    const pacienteId = document.getElementById('notaPacienteIdPsicologo').value;
-    const tipo = document.getElementById('notaTipoPsicologo').value;
-    const contenido = document.getElementById('notaContenidoPsicologo').value;
-    
-    if (!pacienteId) {
-        mostrarMensaje('❌ Selecciona un paciente', 'danger');
-        return;
-    }
-    if (!tipo) {
-        mostrarMensaje('❌ Selecciona un tipo de nota', 'danger');
-        return;
-    }
-    if (!contenido) {
-        mostrarMensaje('❌ Escribe el contenido', 'danger');
-        return;
-    }
-    
-    setLoading(true);
-    try {
-        let payload = { pacienteId: parseInt(pacienteId), tipo: tipo };
-        if (tipo === 'DIAGNOSTICO') payload.diagnostico = contenido;
-        else if (tipo === 'RECOMENDACION' || tipo === 'CONSEJO' || tipo === 'OBSERVACION') payload.recomendaciones = contenido;
-        
-        const res = await authFetch('/api/notas', { method: 'POST', body: JSON.stringify(payload) });
-        if (res.ok) {
-            document.getElementById('notaContenidoPsicologo').value = '';
-            document.getElementById('notaTipoPsicologo').value = '';
-            await cargarNotasPacientePsicologo(parseInt(pacienteId));
-            mostrarMensaje('✅ Nota guardada', 'success');
-        } else {
-            mostrarMensaje('Error al guardar', 'danger');
-        }
-    } catch(e) {
-        mostrarMensaje('Error de conexión', 'danger');
-    }
-    setLoading(false);
+    return guardarNotaClinico({ sufijo: 'Psicologo' });
 }
 
 function verNotasPacientePsicologo(id, nombre) {
-    seleccionarPacienteNotaPsicologo(id, nombre);
-    document.querySelector('[data-tab="notas"]').click();
+    return verNotasPacienteClinico({ sufijo: 'Psicologo', id, nombre, alSeleccionar: (v) => { pacienteSeleccionadoIdPsicologo = v; } });
 }
