@@ -45,11 +45,13 @@ import mx.com.ubam.isc.apijwt.model.Asignacion;
 import mx.com.ubam.isc.apijwt.model.Cita;
 import mx.com.ubam.isc.apijwt.model.Cliente;
 import mx.com.ubam.isc.apijwt.model.Derivacion;
+import mx.com.ubam.isc.apijwt.model.ListaEspera;
 import mx.com.ubam.isc.apijwt.model.Usuario;
 import mx.com.ubam.isc.apijwt.repository.AsignacionRepository;
 import mx.com.ubam.isc.apijwt.repository.CitaRepository;
 import mx.com.ubam.isc.apijwt.repository.ClienteRepository;
 import mx.com.ubam.isc.apijwt.repository.DerivacionRepository;
+import mx.com.ubam.isc.apijwt.repository.ListaEsperaRepository;
 import mx.com.ubam.isc.apijwt.repository.NotaMedicaRepository;
 import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.service.AuditoriaService;
@@ -79,6 +81,7 @@ class PermisosClinicosTest {
     @Mock private AsignacionRepository asignacionRepository;
     @Mock private CitaRepository citaRepository;
     @Mock private DerivacionRepository derivacionRepository;
+    @Mock private ListaEsperaRepository listaEsperaRepository;
     @Mock private NotaMedicaRepository notaRepository;
     @Mock private CitaService citaService;
     @Mock private AuditoriaService auditoriaService;
@@ -272,6 +275,59 @@ class PermisosClinicosTest {
 
         sesion("jefe.psicologia");
         assertEquals(200, derivacionController.bandeja().getStatusCode().value());
+    }
+
+    // ============== CAMBIO DE DEPARTAMENTO DESDE LA LISTA DE ESPERA ==============
+
+    private ListaEspera solicitudDeEspera(Long id, Long pacienteId) {
+        ListaEspera solicitud = new ListaEspera();
+        solicitud.setId(id);
+        solicitud.setPaciente(cliente(pacienteId));
+        solicitud.setServicioInteres("Seguimiento");
+        return solicitud;
+    }
+
+    @Test
+    void unPacienteNoPideCambioSobreLaEsperaDeOtro() {
+        Usuario paciente = usuario(42L, "paciente1", "PACIENTE", null);
+        when(usuarioRepository.findByUsername("paciente1")).thenReturn(Optional.of(paciente));
+        when(clienteRepository.findByCorreo("paciente1")).thenReturn(cliente(PACIENTE_ID));
+        when(listaEsperaRepository.findById(7L)).thenReturn(Optional.of(solicitudDeEspera(7L, OTRO_PACIENTE_ID)));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("solicitudId", 7L);
+        payload.put("departamentoDestino", "PSIQUIATRIA");
+        payload.put("motivo", "Necesito medicación");
+
+        sesion("paciente1");
+        ResponseEntity<?> respuesta = derivacionController.desdeListaEspera(payload);
+
+        assertEquals(403, respuesta.getStatusCode().value());
+        assertTrue(String.valueOf(respuesta.getBody()).contains("tu propia solicitud"));
+    }
+
+    @Test
+    void unPacientePideCambioDesdeSuPropiaListaDeEspera() {
+        Usuario paciente = usuario(42L, "paciente1", "PACIENTE", null);
+        when(usuarioRepository.findByUsername("paciente1")).thenReturn(Optional.of(paciente));
+        when(clienteRepository.findByCorreo("paciente1")).thenReturn(cliente(PACIENTE_ID));
+        when(listaEsperaRepository.findById(7L)).thenReturn(Optional.of(solicitudDeEspera(7L, PACIENTE_ID)));
+        when(derivacionRepository.save(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("solicitudId", 7L);
+        payload.put("departamentoDestino", "PSIQUIATRIA");
+        payload.put("motivo", "Necesito valoración psiquiátrica");
+
+        sesion("paciente1");
+        ResponseEntity<?> respuesta = derivacionController.desdeListaEspera(payload);
+
+        assertEquals(200, respuesta.getStatusCode().value());
+        Derivacion creada = (Derivacion) respuesta.getBody();
+        assertEquals(Derivacion.PENDIENTE, creada.getEstado());
+        assertEquals("LISTA_ESPERA", creada.getDepartamentoOrigen());
+        assertEquals("PSIQUIATRIA", creada.getDepartamentoDestino());
+        assertEquals(PACIENTE_ID, creada.getCliente().getId());
     }
 
     // ==================== ASIGNACIONES ====================

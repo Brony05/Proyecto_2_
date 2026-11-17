@@ -514,6 +514,19 @@ async function cargarMisSolicitudes() {
                                 <small class="text-muted">Registrado: ${new Date(s.fechaRegistro).toLocaleString()}</small>
                                 ${s.fechaDeseada ? `<br><small class="text-muted">Fecha deseada: ${formatearFecha(s.fechaDeseada)}</small>` : ''}
                                 ${s.horarioPreferido ? `<br><small class="text-muted">Horario preferido: ${s.horarioPreferido}</small>` : ''}
+                                <details class="mt-2">
+                                    <summary class="small text-primary" style="cursor:pointer">Pedir cambio de departamento</summary>
+                                    <div class="mt-2" style="max-width:320px">
+                                        <select id="depto-${s.id}" class="form-select form-select-sm mb-2">
+                                            <option value="PSICOLOGIA">Psicologia</option>
+                                            <option value="PSIQUIATRIA">Psiquiatria</option>
+                                            <option value="ENFERMERIA">Enfermeria</option>
+                                            <option value="TRABAJO_SOCIAL">Trabajo Social</option>
+                                        </select>
+                                        <textarea id="motivo-${s.id}" class="form-control form-control-sm mb-2" rows="2" placeholder="¿Por que necesitas otro departamento?"></textarea>
+                                        <button class="btn btn-sm btn-primary-custom" onclick="pedirCambioDepartamento(${s.id})">Enviar solicitud</button>
+                                    </div>
+                                </details>
                             </div>
                             <div class="text-end">
                                 <span class="pill-estado ${s.notificado ? 'pill-notificado' : 'pill-espera'}">${s.notificado ? 'Notificado' : 'En espera'}</span>
@@ -525,6 +538,37 @@ async function cargarMisSolicitudes() {
             }
         }
     } catch(e) { console.error(e); }
+}
+
+async function pedirCambioDepartamento(solicitudId) {
+    const select = document.getElementById(`depto-${solicitudId}`);
+    const motivo = (document.getElementById(`motivo-${solicitudId}`).value || '').trim();
+
+    if (!motivo) {
+        mostrarMensaje('Explica el motivo del cambio de departamento', 'danger');
+        return;
+    }
+
+    setLoading(true);
+    try {
+        const res = await authFetch('/api/derivaciones/desde-lista-espera', {
+            method: 'POST',
+            body: JSON.stringify({
+                solicitudId: solicitudId,
+                departamentoDestino: select.value,
+                motivo: motivo
+            })
+        });
+        if (res.ok) {
+            mostrarMensaje('✅ Solicitud enviada: la jefatura del departamento la revisará', 'success');
+            cargarMisSolicitudes();
+        } else {
+            mostrarMensaje(await res.text(), 'danger');
+        }
+    } catch(e) {
+        mostrarMensaje('Error de conexión', 'danger');
+    }
+    setLoading(false);
 }
 
 async function eliminarSolicitud(id) {

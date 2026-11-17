@@ -10,11 +10,13 @@ import mx.com.ubam.isc.apijwt.model.Asignacion;
 import mx.com.ubam.isc.apijwt.model.Cita;
 import mx.com.ubam.isc.apijwt.model.Cliente;
 import mx.com.ubam.isc.apijwt.model.Derivacion;
+import mx.com.ubam.isc.apijwt.model.ListaEspera;
 import mx.com.ubam.isc.apijwt.model.Usuario;
 import mx.com.ubam.isc.apijwt.repository.AsignacionRepository;
 import mx.com.ubam.isc.apijwt.repository.CitaRepository;
 import mx.com.ubam.isc.apijwt.repository.ClienteRepository;
 import mx.com.ubam.isc.apijwt.repository.DerivacionRepository;
+import mx.com.ubam.isc.apijwt.repository.ListaEsperaRepository;
 import mx.com.ubam.isc.apijwt.repository.UsuarioRepository;
 import mx.com.ubam.isc.apijwt.service.AuditoriaService;
 import mx.com.ubam.isc.apijwt.service.CitaService;
@@ -60,6 +62,10 @@ public class DerivacionController {
     @Autowired private CitaService citaService;
     @Autowired private AuditoriaService auditoriaService;
     @Autowired private AvisoDerivacionService avisoDerivacionService;
+    @Autowired private ListaEsperaRepository listaEsperaRepository;
+
+    /** Origen de las solicitudes que nacen de la lista de espera (sin cita previa). */
+    static final String ORIGEN_LISTA_ESPERA = "LISTA_ESPERA";
 
     // ==================== CREAR SOLICITUD ====================
     @PostMapping
@@ -134,6 +140,79 @@ public class DerivacionController {
             return ResponseEntity.ok(guardada);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error al solicitar la derivación: " + e.getMessage());
+        }
+    }
+
+    // ==================== CAMBIO DE DEPARTAMENTO DESDE LA LISTA DE ESPERA ====================
+    /**
+     * Quien espera un cupo no tiene cita ni profesional asignado, así que no
+     * puede usar el POST clínico. Aquí pide el cambio desde su propia solicitud
+     * de lista de espera y la petición entra a la bandeja del jefe destino como
+     * cualquier otra derivación.
+     */
+    @PostMapping("/desde-lista-espera")
+    @PreAuthorize("hasRole('PACIENTE')")
+    public ResponseEntity<?> desdeListaEspera(@RequestBody Map<String, Object> payload) {
+        try {
+            Usuario actor = usuarioActual();
+            if (actor == null) return ResponseEntity.status(401).body("Usuario no autenticado");
+
+            Number solicitudIdNum = (Number) payload.get("solicitudId");
+            if (solicitudIdNum == null) return ResponseEntity.badRequest().body("solicitudId es obligatorio");
+
+            ListaEspera solicitud = listaEsperaRepository.findById(solicitudIdNum.longValue()).orElse(null);
+            if (solicitud == null) {
+                return ResponseEntity.badRequest().body("Solicitud de lista de espera no encontrada");
+            }
+
+            Cliente propio = clienteRepository.findByCorreo(actor.getUsername());
+            if (propio == null || solicitud.getPaciente() == null
+                    || !propio.getId().equals(solicitud.getPaciente().getId())) {
+                return ResponseEntity.status(403)
+                    .body("Solo puedes pedir un cambio para tu propia solicitud de lista de espera.");
+            }
+
+            String destino = texto(payload.get("departamentoDestino")).toUpperCase();
+            if (!DEPARTAMENTOS.contains(destino)) {
+                return ResponseEntity.badRequest().body(
+                    "Departamento destino inválido. Opciones: " + String.join(", ", DEPARTAMENTOS));
+            }
+
+            String motivo = texto(payload.get("motivo"));
+            if (motivo.isBlank()) {
+                return ResponseEntity.badRequest().body("Explica el motivo del cambio de departamento");
+            }
+
+            if (derivacionRepository.existsByClienteIdAndDepartamentoDestinoAndEstado(
+                    propio.getId(), destino, Derivacion.PENDIENTE)) {
+                return ResponseEntity.badRequest()
+                    .body("Ya existe una solicitud pendiente para " + destino);
+            }
+
+            Derivacion derivacion = new Derivacion();
+            derivacion.setCliente(propio);
+            derivacion.setUsuarioSolicita(actor);
+            derivacion.setDepartamentoOrigen(ORIGEN_LISTA_ESPERA);
+            derivacion.setDepartamentoDestino(destino);
+            derivacion.setMotivo(motivo);
+            derivacion.setEstado(Derivacion.PENDIENTE);
+            derivacion.setFechaSolicitud(LocalDateTime.now());
+
+            Derivacion guardada = derivacionRepository.save(derivacion);
+
+            auditoriaService.registrar(actor.getUsername(), "DERIVACION_DESDE_LISTA_ESPERA",
+                "El paciente '" + propio.getNombre() + "' pidió cambio de la lista de espera ("
+                + texto(solicitud.getServicioInteres()) + ") a " + destino);
+
+            try {
+                avisoDerivacionService.avisar(ORIGEN_LISTA_ESPERA, destino, propio, motivo, actor);
+            } catch (Exception e) {
+                System.err.println("No se pudo enviar el aviso de derivación: " + e.getMessage());
+            }
+
+            return ResponseEntity.ok(guardada);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al pedir el cambio de departamento: " + e.getMessage());
         }
     }
 
