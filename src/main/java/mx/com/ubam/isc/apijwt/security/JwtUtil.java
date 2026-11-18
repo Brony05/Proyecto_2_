@@ -4,14 +4,25 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import java.security.Key;
 import java.util.Date;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class JwtUtil {
-    // El secreto se lee de variable de entorno JWT_SECRET; el fallback mantiene los tokens existentes válidos
-    private final String SECRET = System.getenv("JWT_SECRET") != null 
-            ? System.getenv("JWT_SECRET") 
-            : "mi_clave_secreta_super_segura_12345678901234567890";
+    /**
+     * Clave de firma de los tokens. Ya no tiene valor por defecto: un secreto
+     * incrustado en el código es el que está en el historial de Git (SC-01).
+     * Si falta, Spring no levanta el contexto y el arranque falla con aviso claro.
+     */
+    private final String SECRET;
+
+    public JwtUtil(@Value("${JWT_SECRET}") String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                "Falta JWT_SECRET: define el secreto en .env (ver docs/secretos.md) o en el entorno.");
+        }
+        this.SECRET = secret;
+    }
     
     private Key getKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
