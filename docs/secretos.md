@@ -7,9 +7,16 @@ código, así que quedaron en el historial de Git desde el primer commit:
 
 | Secreto | Dónde estaba | Estado |
 |---|---|---|
-| Contraseña de MySQL (`root`) | `spring.datasource.password` | ya fuera del archivo, **sin rotar** |
-| App password de Gmail | `spring.mail.password` | ya fuera del archivo, **sin rotar** |
-| Clave de firma JWT | `JwtUtil.SECRET` | ya fuera del código, **sin rotar** |
+| Contraseña de MySQL (`root`) | `spring.datasource.password` | fuera del archivo y **rotada** (2026-11-18) |
+| App password de Gmail | `spring.mail.password` | fuera del archivo, **pendiente de rotar** |
+| Clave de firma JWT | `JwtUtil.SECRET` | fuera del código y **rotada** (2026-11-18) |
+
+La contraseña nueva de MySQL y la clave JWT nueva están en `.env`. Al rotarlas se
+comprobó que la app arranca, que el login responde 200, que un token firmado con la
+clave anterior devuelve 401 y que el aviso de derivación sigue llegando al buzón.
+
+**Pendiente**: revocar la app password de Gmail y poner la nueva en `MAIL_PASSWORD`.
+Solo puede hacerlo el dueño de la cuenta (requiere su contraseña y su 2FA).
 
 ## Qué se hizo
 
