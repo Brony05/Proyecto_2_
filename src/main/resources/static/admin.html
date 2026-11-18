@@ -3,26 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Consultorio Psiquiátrico</title>
+    <title>Admin - Consultorio Psiquiatrico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
-<body class="light-mode">
-    <div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+<body class="light-mode admin-body">
+    <div class="loading" id="loading"><div class="spinner-border text-primary" role="status"></div></div>
 
     <nav class="navbar navbar-custom">
         <div class="container-fluid">
-            <span class="navbar-brand text-white"><i class="fas fa-crown"></i> Panel Administrativo</span>
+            <span class="navbar-brand text-white fw-bold"><i class="fas fa-crown"></i> Panel Administrativo</span>
             <div class="d-flex align-items-center gap-3">
-                <div class="text-white"><i class="fas fa-user-shield"></i> <span id="userName" class="fw-bold"></span></div>
+                <div class="nav-usuario">
+                    <div class="avatar" id="adminAvatar">A</div>
+                    <div>
+                        <div class="nombre" id="userName"></div>
+                        <div class="rol-chip">Administrador</div>
+                    </div>
+                </div>
                 <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-sign-out-alt"></i> Salir</button>
             </div>
         </div>
     </nav>
-
-    <button class="theme-toggle" onclick="toggleModoOscuro()"><i class="fas fa-moon"></i></button>
 
     <div class="main-container">
         <ul class="nav nav-tabs">
@@ -34,7 +39,7 @@
             <li class="nav-item"><button class="nav-link" data-tab="reportes"><i class="fas fa-file-alt"></i> Reportes</button></li>
         </ul>
 
-        <!-- DASHBOARD -->
+        <!-- ==================== DASHBOARD ==================== -->
         <div id="dashboard" class="tab-content">
             <div class="row">
                 <div class="col-md-3"><div class="stat-card"><i class="fas fa-users"></i><div class="number" id="totalClientes">0</div><div class="label">Clientes</div></div></div>
@@ -43,43 +48,51 @@
                 <div class="col-md-3"><div class="stat-card"><i class="fas fa-chart-line"></i><div class="number" id="ingresosProyectados">$0</div><div class="label">Ingresos Proyectados</div></div></div>
             </div>
             <div class="charts-grid">
-                <div class="chart-container"><div class="chart-title">Evolución de Citas</div><canvas id="citasLineChart" height="250"></canvas></div>
-                <div class="chart-container"><div class="chart-title">Servicios Más Solicitados</div><canvas id="serviciosDoughnutChart" height="250"></canvas></div>
+                <div class="grafica-panel">
+                    <div class="chart-title"><div class="ico ico-cal"><i class="fas fa-chart-line"></i></div> Evolución de citas (7 días)</div>
+                    <canvas id="citasLineChart" height="250"></canvas>
+                </div>
+                <div class="grafica-panel">
+                    <div class="chart-title"><div class="ico ico-verde"><i class="fas fa-chart-pie"></i></div> Servicios más solicitados</div>
+                    <canvas id="serviciosDoughnutChart" height="250"></canvas>
+                </div>
             </div>
         </div>
 
-        <!-- CLIENTES -->
+        <!-- ==================== CLIENTES ==================== -->
         <div id="clientes" class="tab-content" style="display:none;">
             <div class="filter-section">
-                <div class="row">
+                <div class="row g-2 align-items-end">
                     <div class="col-md-4">
                         <button class="btn btn-primary-custom" onclick="abrirModalCliente()"><i class="fas fa-plus"></i> Nuevo Cliente</button>
                     </div>
                     <div class="col-md-8">
-                        <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar cliente...">
+                        <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar cliente por nombre...">
                     </div>
                 </div>
             </div>
             <div class="table-container">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Teléfono</th>
-                            <th>Correo</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyClientes"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th>Correo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyClientes"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- CITAS -->
+        <!-- ==================== CITAS ==================== -->
         <div id="citas" class="tab-content" style="display:none;">
             <div class="filter-section">
-                <div class="row">
+                <div class="row g-2 align-items-end">
                     <div class="col-md-3">
                         <button class="btn btn-primary-custom" onclick="abrirModalCita()"><i class="fas fa-plus"></i> Nueva Cita</button>
                     </div>
@@ -101,118 +114,116 @@
                 </div>
             </div>
             <div class="table-container">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Fecha</th>
-                            <th>Hora</th>
-                            <th>Servicio</th>
-                            <th>Precio</th>
-                            <th>Cliente</th>
-                            <th>Acompañante</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyCitas"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Servicio</th>
+                                <th>Precio</th>
+                                <th>Cliente</th>
+                                <th>Acompañante</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyCitas"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- USUARIOS -->
+        <!-- ==================== USUARIOS ==================== -->
         <div id="usuarios" class="tab-content" style="display:none;">
             <div class="filter-section">
                 <button class="btn btn-primary-custom" onclick="abrirModalUsuario()"><i class="fas fa-user-plus"></i> Nuevo Usuario</button>
             </div>
             <div class="table-container">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Usuario</th>
-                            <th>Rol</th>
-                            <th>Especialidad</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyUsuarios"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Usuario</th>
+                                <th>Rol</th>
+                                <th>Especialidad</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyUsuarios"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- SERVICIOS -->
+        <!-- ==================== SERVICIOS ==================== -->
         <div id="servicios" class="tab-content" style="display:none;">
             <div class="filter-section">
                 <button class="btn btn-primary-custom" onclick="abrirModalServicio()"><i class="fas fa-plus"></i> Nuevo Servicio</button>
             </div>
             <div class="table-container">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Descripción</th>
-                            <th>Precio</th>
-                            <th>Duración</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyServicios"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Descripción</th>
+                                <th>Precio</th>
+                                <th>Duración</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyServicios"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- REPORTES -->
+        <!-- ==================== REPORTES ==================== -->
         <div id="reportes" class="tab-content" style="display:none;">
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="table-container">
-                        <h5><i class="fas fa-file-pdf"></i> Reportes PDF</h5>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <label class="form-label">Fecha inicio</label>
-                                <input type="date" id="reporteInicio" class="form-control">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Fecha fin</label>
-                                <input type="date" id="reporteFin" class="form-control">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Tipo de reporte</label>
-                                <select id="reporteTipo" class="form-select">
-                                    <option value="todas">Todas las citas</option>
-                                    <option value="completadas">Solo citas completadas</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-3">
-                            <button onclick="exportarPDF()" class="btn btn-danger-custom w-100"><i class="fas fa-file-pdf"></i> Generar Reporte PDF</button>
-                        </div>
+            <div class="table-container">
+                <h5><div class="ico ico-rojo"><i class="fas fa-file-pdf"></i></div> Reportes PDF</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Fecha inicio</label>
+                        <input type="date" id="reporteInicio" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Fecha fin</label>
+                        <input type="date" id="reporteFin" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tipo de reporte</label>
+                        <select id="reporteTipo" class="form-select">
+                            <option value="todas">Todas las citas</option>
+                            <option value="completadas">Solo citas completadas</option>
+                        </select>
                     </div>
                 </div>
-                <div class="col-md-12 mt-3">
-                    <div class="table-container">
-                        <h5><i class="fas fa-database"></i> Respaldo de Base de Datos</h5>
-                        <p class="text-muted">Los respaldos automáticos se realizan diariamente a las 2:00 AM</p>
-                        <button onclick="realizarBackupManual()" class="btn btn-backup"><i class="fas fa-download"></i> Realizar Backup Manual</button>
-                    </div>
+                <div class="mt-3">
+                    <button onclick="exportarPDF()" class="btn btn-danger-custom w-100"><i class="fas fa-file-pdf"></i> Generar Reporte PDF</button>
                 </div>
+            </div>
+            <div class="table-container mt-3">
+                <h5><div class="ico ico-azul"><i class="fas fa-database"></i></div> Respaldo de Base de Datos</h5>
+                <p class="text-muted mb-2">Los respaldos automáticos se realizan diariamente a las 2:00 AM</p>
+                <button onclick="realizarBackupManual()" class="btn btn-backup"><i class="fas fa-download"></i> Realizar Backup Manual</button>
             </div>
         </div>
     </div>
 
-    <!-- MODALES -->
-
-    <!-- Modal Cliente -->
+    <!-- ==================== MODAL CLIENTE ==================== -->
     <div class="modal fade" id="clienteModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-user"></i> Cliente</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title"><i class="fas fa-user me-2"></i> Cliente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="clienteId">
@@ -237,13 +248,13 @@
         </div>
     </div>
 
-    <!-- Modal Cita -->
+    <!-- ==================== MODAL CITA ==================== -->
     <div class="modal fade" id="citaModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-calendar-plus"></i> Nueva Cita</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title"><i class="fas fa-calendar-plus me-2"></i> Nueva Cita</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
@@ -285,13 +296,13 @@
         </div>
     </div>
 
-    <!-- Modal Usuario (CON CAMPO NOMBRE COMPLETO) -->
+    <!-- ==================== MODAL USUARIO ==================== -->
     <div class="modal fade" id="usuarioModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="fas fa-user-plus"></i> Nuevo Usuario</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i> Nuevo Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -308,41 +319,36 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Rol *</label>
-						<select id="nuevoRol" class="form-select mb-2">
-						    <option value="ADMIN">ADMIN</option>
-						    <option value="DIRECTOR">DIRECTOR</option>
-						    <option value="COMITE_ETICA">COMITÉ DE ÉTICA</option>
-						    <option value="JEFE_PSICOLOGIA">JEFE DE PSICOLOGÍA</option>
-						    <option value="JEFE_PSIQUIATRIA">JEFE DE PSIQUIATRÍA</option>
-						    <option value="JEFE_TRABAJO_SOCIAL">JEFE DE TRABAJO SOCIAL</option>
-						    <option value="JEFE_ENFERMERIA">JEFE DE ENFERMERÍA</option>
-						    <option value="JEFE_ARCHIVO">JEFE DE ARCHIVO CLÍNICO</option>
-						    <option value="PSICOLOGO">PSICÓLOGO</option>
-						    <option value="PSIQUIATRA">PSIQUIATRA</option>
-						    <option value="ENFERMERO">ENFERMERO</option>
-						    <option value="TRABAJADOR_SOCIAL">TRABAJADOR SOCIAL</option>
-						    <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
-						    <option value="PACIENTE">PACIENTE</option>
-						</select>
-						
+                        <select id="nuevoRol" class="form-select mb-2">
+                            <option value="ADMIN">ADMIN</option>
+                            <option value="DIRECTOR">DIRECTOR</option>
+                            <option value="COMITE_ETICA">COMITÉ DE ÉTICA</option>
+                            <option value="JEFE_PSICOLOGIA">JEFE DE PSICOLOGÍA</option>
+                            <option value="JEFE_PSIQUIATRIA">JEFE DE PSIQUIATRÍA</option>
+                            <option value="JEFE_TRABAJO_SOCIAL">JEFE DE TRABAJO SOCIAL</option>
+                            <option value="JEFE_ENFERMERIA">JEFE DE ENFERMERÍA</option>
+                            <option value="JEFE_ARCHIVO">JEFE DE ARCHIVO CLÍNICO</option>
+                            <option value="PSICOLOGO">PSICÓLOGO</option>
+                            <option value="PSIQUIATRA">PSIQUIATRA</option>
+                            <option value="ENFERMERO">ENFERMERO</option>
+                            <option value="TRABAJADOR_SOCIAL">TRABAJADOR SOCIAL</option>
+                            <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
+                            <option value="PACIENTE">PACIENTE</option>
+                        </select>
                     </div>
                     <div id="especialidadDiv" style="display:none;">
-                        <label class="form-label">Especialidad *</label>
-						<div class="mb-3">
-						    <label class="form-label">Departamento</label>
-						    <select id="nuevoDepartamento" class="form-select">
-						        <option value="">Seleccionar departamento</option>
-						        <option value="PSICOLOGIA">PSICOLOGÍA</option>
-						        <option value="PSIQUIATRIA">PSIQUIATRÍA</option>
-						        <option value="TRABAJO_SOCIAL">TRABAJO SOCIAL</option>
-						        <option value="ENFERMERIA">ENFERMERÍA</option>
-						        <option value="ARCHIVO">ARCHIVO CLÍNICO</option>
-						        <option value="ADMINISTRACION">ADMINISTRACIÓN</option>
-						    </select>
-						</div>
-						
-						
-						
+                        <label class="form-label">Departamento</label>
+                        <div class="mb-3">
+                            <select id="nuevoDepartamento" class="form-select">
+                                <option value="">Seleccionar departamento</option>
+                                <option value="PSICOLOGIA">PSICOLOGÍA</option>
+                                <option value="PSIQUIATRIA">PSIQUIATRÍA</option>
+                                <option value="TRABAJO_SOCIAL">TRABAJO SOCIAL</option>
+                                <option value="ENFERMERIA">ENFERMERÍA</option>
+                                <option value="ARCHIVO">ARCHIVO CLÍNICO</option>
+                                <option value="ADMINISTRACION">ADMINISTRACIÓN</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -353,13 +359,13 @@
         </div>
     </div>
 
-    <!-- Modal Servicio -->
+    <!-- ==================== MODAL SERVICIO ==================== -->
     <div class="modal fade" id="servicioModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title"><i class="fas fa-tag"></i> Servicio</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-tag me-2"></i> Servicio</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="servicioId">

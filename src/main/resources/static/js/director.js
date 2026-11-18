@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     document.getElementById('userName').innerText = localStorage.getItem('username');
+    const avatarDir = document.getElementById('dirAvatar');
+    if (avatarDir) avatarDir.innerText = (localStorage.getItem('username') || 'D').charAt(0).toUpperCase();
     cargarModoOscuro();
     cargarDashboardDirector();
     cargarPersonal();

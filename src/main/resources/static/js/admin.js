@@ -10,7 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    document.getElementById('userName').innerText = localStorage.getItem('username');
+    
+    const nombre = localStorage.getItem('username') || 'Admin';
+    document.getElementById('userName').innerText = nombre;
+    const avatar = document.getElementById('adminAvatar');
+    if (avatar) avatar.innerText = nombre.charAt(0).toUpperCase();
     cargarModoOscuro();
     cargarDashboard();
     cargarClientes();
@@ -25,10 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Búsqueda de clientes
     document.getElementById('buscarCliente')?.addEventListener('input', buscarCliente);
     
-    // Mostrar especialidad al seleccionar DOCTOR
+    // Mostrar departamento al seleccionar un rol clinico
     document.getElementById('nuevoRol')?.addEventListener('change', function() {
         const especialidadDiv = document.getElementById('especialidadDiv');
-        especialidadDiv.style.display = this.value === 'DOCTOR' ? 'block' : 'none';
+        const esClinico = ['PSICOLOGO', 'PSIQUIATRA', 'DOCTOR'].includes(this.value);
+        especialidadDiv.style.display = esClinico ? 'block' : 'none';
     });
     
     // Tabs
@@ -441,20 +446,13 @@ async function crearUsuario() {
         mostrarMensaje('La contraseña debe tener al menos 4 caracteres', 'danger');
         return;
     }
-    if (usuario.rol === 'DOCTOR') {
-        usuario.especialidad = document.getElementById('nuevoEspecialidad').value;
+    if (['PSICOLOGO', 'PSIQUIATRA', 'DOCTOR'].includes(usuario.rol)) {
+        usuario.especialidad = document.getElementById('nuevoDepartamento').value;
         if (!usuario.especialidad) {
-            mostrarMensaje('Selecciona una especialidad para el DOCTOR', 'danger');
+            mostrarMensaje('Selecciona el departamento del profesional', 'danger');
             return;
         }
     }
-	if (usuario.rol === 'PSICOLOGO' || usuario.rol === 'PSIQUIATRA') {
-		        usuario.especialidad = document.getElementById('nuevoEspecialidad').value;
-		        if (!usuario.especialidad) {
-		            mostrarMensaje('Selecciona una especialidad para el profesional', 'danger');
-		            return;
-	    }
-	}
     
     setLoading(true);
     try {

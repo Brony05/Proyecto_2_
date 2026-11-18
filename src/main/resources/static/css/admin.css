@@ -1,0 +1,226 @@
+/* ============================================================
+   ADMIN — REDISEÑO 2026
+   Se carga solo en admin.html. styles.css sigue intacto para
+   el resto de vistas; este archivo sobreescribe/decora.
+   Reutiliza la paleta y patrón de doctor.css.
+   ============================================================ */
+
+:root {
+    --adm-primario: #667eea;
+    --adm-secundario: #764ba2;
+    --adm-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --adm-fondo: #f4f6fb;
+    --adm-tinta: #2d3142;
+    --adm-muted: #6b7280;
+    --adm-card: #ffffff;
+    --adm-borde: #e8ecf4;
+    --adm-verde: #10b981;
+    --adm-amarillo: #f59e0b;
+    --adm-rojo: #ef4444;
+    --adm-cyan: #06b6d4;
+    --adm-sombra: 0 10px 30px rgba(45, 49, 66, 0.08);
+    --adm-sombra-hover: 0 18px 40px rgba(102, 126, 234, 0.18);
+    --adm-radio: 18px;
+}
+
+/* ==================== FONDO ==================== */
+body.admin-body {
+    background:
+        radial-gradient(ellipse 60% 40% at 10% 0%, rgba(102, 126, 234, 0.12), transparent),
+        radial-gradient(ellipse 50% 45% at 95% 10%, rgba(118, 75, 162, 0.10), transparent),
+        var(--adm-fondo);
+    color: var(--adm-tinta);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+}
+
+/* ==================== NAVBAR ==================== */
+.admin-body .navbar-custom {
+    background: var(--adm-grad);
+    padding: 14px 22px;
+    box-shadow: 0 6px 24px rgba(102, 126, 234, 0.35);
+}
+.admin-body .nav-usuario {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50px; padding: 6px 16px 6px 8px;
+    backdrop-filter: blur(6px);
+}
+.admin-body .nav-usuario .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9); color: var(--adm-secundario);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+}
+.admin-body .nav-usuario .nombre {
+    color: #fff; font-weight: 600; max-width: 180px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-body .nav-usuario .rol-chip {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(255,255,255,.25); padding: 2px 8px; border-radius: 10px;
+}
+.admin-body .badge-especialidad {
+    background: rgba(255,255,255,.25) !important;
+    color: #fff !important; border: 1px solid rgba(255,255,255,.35);
+    border-radius: 50px; font-weight: 600; padding: 5px 12px; font-size: 11px;
+}
+
+/* ==================== TABS PÍLDORA ==================== */
+.admin-body .nav-tabs { gap: 8px; border-bottom: none; flex-wrap: wrap; }
+.admin-body .nav-tabs .nav-link {
+    border: none; border-radius: 14px; padding: 11px 20px;
+    font-weight: 600; background: var(--adm-card); color: var(--adm-muted);
+    box-shadow: var(--adm-sombra); display: flex; align-items: center; gap: 8px;
+    transition: all 0.25s ease;
+}
+.admin-body .nav-tabs .nav-link i { font-size: 15px; }
+.admin-body .nav-tabs .nav-link:hover { transform: translateY(-2px); color: var(--adm-primario); }
+.admin-body .nav-tabs .nav-link.active {
+    background: var(--adm-grad); color: #fff;
+    box-shadow: 0 6px 18px rgba(102, 126, 234, 0.4);
+}
+
+/* ==================== KPI / STAT CARDS ==================== */
+.stat-card {
+    border: none !important; border-radius: var(--adm-radio) !important;
+    background: var(--adm-card) !important;
+    box-shadow: var(--adm-sombra) !important;
+    padding: 22px 24px !important; margin-bottom: 14px;
+    position: relative; overflow: hidden;
+    transition: transform .22s ease, box-shadow .22s ease;
+    animation: admAparecer .35s ease both;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: var(--adm-sombra-hover) !important; }
+.stat-card::after {
+    content: ''; position: absolute; right: -24px; bottom: -24px;
+    width: 110px; height: 110px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(102,126,234,.10), rgba(118,75,162,.10));
+}
+.stat-card i {
+    position: absolute; top: 20px; right: 20px; font-size: 20px;
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    z-index: 1;
+}
+.stat-card i.fa-users         { background: var(--adm-primario); }
+.stat-card i.fa-calendar-check{ background: var(--adm-cyan); }
+.stat-card i.fa-dollar-sign   { background: var(--adm-verde); }
+.stat-card i.fa-chart-line    { background: var(--adm-amarillo); }
+.stat-card .number {
+    font-size: 36px !important; font-weight: 800 !important;
+    color: var(--adm-tinta) !important; text-align: left !important;
+    line-height: 1.1; margin: 26px 0 4px;
+}
+.stat-card .label { color: var(--adm-muted) !important; font-weight: 600; font-size: 13px; text-align: left !important; }
+
+/* ==================== TABLAS ==================== */
+.admin-body .table-container {
+    background: var(--adm-card); border: 1px solid var(--adm-borde);
+    border-radius: var(--adm-radio); box-shadow: var(--adm-sombra);
+    padding: 22px 24px; margin-top: 0;
+}
+.admin-body .table-container h5 {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 17px; margin-bottom: 16px;
+}
+.admin-body .table-container h5 i { color: var(--adm-primario); }
+.admin-body .table-container h5 .ico {
+    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px;
+}
+.ico-cal   { background: var(--adm-grad); }
+.ico-verde { background: var(--adm-verde); }
+.ico-azul  { background: var(--adm-primario); }
+.ico-rojo  { background: var(--adm-rojo); }
+.ico-amar  { background: var(--adm-amarillo); }
+.admin-body .table { margin-bottom: 0; }
+.admin-body .table thead th {
+    background: #f8f9ff; border: none; border-bottom: 2px solid var(--adm-borde) !important;
+    color: var(--adm-muted); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: .8px; font-weight: 700; padding: 10px 12px;
+    white-space: nowrap;
+}
+.admin-body .table tbody td {
+    vertical-align: middle; padding: 12px; font-size: 14px;
+    border-bottom: 1px solid var(--adm-borde);
+}
+.admin-body .table tbody tr { transition: background .15s ease; }
+.admin-body .table tbody tr:hover { background: #f6f8ff; }
+.admin-body .table tbody tr:last-child td { border-bottom: none; }
+
+/* ==================== FILTROS ==================== */
+.admin-body .filter-section {
+    background: var(--adm-card); border: 1px solid var(--adm-borde);
+    border-radius: var(--adm-radio); box-shadow: var(--adm-sombra);
+    padding: 16px 20px; margin-bottom: 18px;
+}
+.admin-body .form-control, .admin-body .form-select {
+    border-radius: 12px; border: 1.5px solid var(--adm-borde);
+    padding: 9px 14px; font-size: 14px;
+}
+.admin-body .form-control:focus, .admin-body .form-select:focus {
+    border-color: var(--adm-primario); box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+}
+
+/* ==================== BOTONES ==================== */
+.admin-body .btn { border-radius: 12px; font-weight: 600; }
+.admin-body .btn-sm { border-radius: 10px; }
+.admin-body .btn-primary, .admin-body .btn-primary-custom {
+    background: var(--adm-grad); border: none;
+}
+.admin-body .btn-primary:hover, .admin-body .btn-primary-custom:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(102,126,234,.4); }
+.admin-body .btn-success { background: var(--adm-verde); border: none; }
+.admin-body .btn-warning { background: #fbbf24; color: #7c2d12; border: none; }
+.admin-body .btn-danger-custom { background: var(--adm-rojo); border: none; color: #fff; }
+.admin-body .btn-backup {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1); border: none; color: #fff; font-weight: 700;
+    padding: 12px 26px; border-radius: 14px; box-shadow: 0 8px 22px rgba(14,165,233,.35);
+}
+.admin-body .btn-backup:hover { transform: translateY(-2px); }
+
+/* ==================== DASHBOARD GRÁFICAS ==================== */
+.grafica-panel { background: var(--adm-card); border: 1px solid var(--adm-borde); border-radius: var(--adm-radio); box-shadow: var(--adm-sombra); padding: 20px; margin-bottom: 20px; animation: admAparecer .35s ease both; }
+.grafica-panel .chart-title {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 16px; margin-bottom: 14px; color: var(--adm-tinta);
+}
+.admin-body .charts-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; padding: 10px;
+}
+.grafica-panel canvas { max-height: 260px; }
+.empty-chart-note {
+    text-align: center; color: var(--adm-muted); font-size: 14px;
+    padding: 26px 12px; background: #f8f9fd; border-radius: 14px;
+}
+
+/* ==================== REPORTES ==================== */
+.reporte-ico-titulo { font-weight: 800; accent-color: var(--adm-primario); }
+.admin-body .form-label { font-weight: 600; color: var(--adm-muted); font-size: 12.5px; }
+
+/* ==================== MODALES ==================== */
+.admin-body .modal-content {
+    border-radius: var(--adm-radio); border: none;
+    box-shadow: 0 24px 70px rgba(45,49,66,.35);
+}
+.admin-body .modal-header {
+    border-bottom: 1px solid var(--adm-borde);
+    background: var(--adm-grad); color: #fff;
+    border-radius: var(--adm-radio) var(--adm-radio) 0 0;
+}
+.admin-body .modal-header h5 { font-weight: 800; }
+.admin-body .modal-header .btn-close { filter: brightness(0) invert(1); }
+.admin-body .modal-footer { border-top: 1px solid var(--adm-borde); }
+.modal-nota-header { color: var(--adm-tinta); font-weight: 700; margin-bottom: 4px; }
+
+/* ==================== ANIMACIÓN ==================== */
+@keyframes admAparecer { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .stat-card .number { font-size: 28px !important; }
+    .admin-body .nav-tabs .nav-link { padding: 10px 14px; font-size: 13px; }
+    .admin-body .table { font-size: 13px; }
+    .admin-body .charts-grid { grid-template-columns: 1fr; }
+}

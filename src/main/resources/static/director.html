@@ -6,76 +6,29 @@
     <title>Director - Consultorio Psiquiátrico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/css/styles.css">
-    <style>
-        body.light-mode {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .navbar-custom { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); padding: 15px 20px; }
-        .stat-card {
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            text-align: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 5px;
-            background: linear-gradient(90deg, #1a237e, #283593);
-        }
-        .stat-card:hover { transform: translateY(-5px); }
-        .stat-card i { font-size: 45px; color: #1a237e; margin-bottom: 15px; }
-        .stat-card .number { font-size: 36px; font-weight: bold; }
-        .stat-card .label { color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-        .chart-container { background: white; border-radius: 20px; padding: 25px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .chart-title { font-size: 18px; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0; }
-        .table-container { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow-x: auto; }
-        .table thead th { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); color: white; border: none; padding: 12px; }
-        .filter-section { background: white; border-radius: 15px; padding: 15px 20px; margin-bottom: 20px; }
-        .btn-primary-custom { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); border: none; border-radius: 10px; padding: 10px 25px; font-weight: 600; color: white; }
-        .nav-tabs .nav-link.active { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); color: white; }
-        .badge-departamento { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .badge-psicologia { background: #4caf50; color: white; }
-        .badge-psiquiatria { background: #2196f3; color: white; }
-        .badge-trabajo-social { background: #ff9800; color: white; }
-        .badge-enfermeria { background: #9c27b0; color: white; }
-        .badge-archivo { background: #795548; color: white; }
-        .badge-administracion { background: #607d8b; color: white; }
-        .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; }
-        .alert-custom { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; animation: slideIn 0.3s ease; border-radius: 12px; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .theme-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #1a237e 0%, #283593 100%); color: white; border: none; cursor: pointer; z-index: 1000; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-        .theme-toggle:hover { transform: scale(1.1); }
-        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 25px; }
-        @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
-    </style>
+    <link rel="stylesheet" href="/css/clinico.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
-<body class="light-mode">
+<body class="light-mode clinico-body">
 
-<div class="loading" id="loading"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div></div>
+<div class="loading" id="loading"><div class="spinner-border text-primary" role="status"></div></div>
 
 <nav class="navbar navbar-custom">
     <div class="container-fluid">
-        <span class="navbar-brand text-white"><i class="fas fa-hospital"></i> Panel Director</span>
+        <span class="navbar-brand text-white fw-bold"><i class="fas fa-hospital"></i> Panel Director</span>
         <div class="d-flex align-items-center gap-3">
-            <div class="text-white"><i class="fas fa-user-tie"></i> <span id="userName" class="fw-bold"></span></div>
+            <div class="nav-usuario">
+                <div class="avatar" id="dirAvatar">D</div>
+                <div>
+                    <div class="nombre" id="userName"></div>
+                    <div class="rol-chip">Director</div>
+                </div>
+            </div>
             <button onclick="logout()" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-sign-out-alt"></i> Salir</button>
         </div>
     </div>
 </nav>
-
-<button class="theme-toggle" onclick="toggleModoOscuro()"><i class="fas fa-moon"></i></button>
 
 <div class="main-container">
     <ul class="nav nav-tabs">
@@ -104,7 +57,7 @@
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <i class="fas fa-users"></i>
+                    <i class="fas fa-user-injured"></i>
                     <div class="number" id="totalPacientes">0</div>
                     <div class="label">Pacientes Activos</div>
                 </div>
@@ -118,24 +71,22 @@
             </div>
         </div>
         <div class="charts-grid">
-            <div class="chart-container">
-                <div class="chart-title"><i class="fas fa-chart-bar"></i> Citas por Departamento</div>
+            <div class="grafica-panel">
+                <div class="panel-titulo"><div class="ico ico-cal"><i class="fas fa-chart-bar"></i></div> Citas por Departamento</div>
                 <canvas id="citasDepartamentoChart" height="250"></canvas>
             </div>
-            <div class="chart-container">
-                <div class="chart-title"><i class="fas fa-chart-pie"></i> Distribución de Personal</div>
+            <div class="grafica-panel">
+                <div class="panel-titulo"><div class="ico ico-verde"><i class="fas fa-chart-pie"></i></div> Distribución de Personal</div>
                 <canvas id="personalDepartamentoChart" height="250"></canvas>
             </div>
         </div>
-        <div class="row">
-            <div class="col-md-12">
-                <div class="table-container">
-                    <h5><i class="fas fa-calendar-alt"></i> Citas Recientes</h5>
-                    <table class="table table-hover">
-                        <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th>Departamento</th><th>Estado</th></tr></thead>
-                        <tbody id="tbodyCitasRecientes"></tbody>
-                    </table>
-                </div>
+        <div class="table-container mt-2">
+            <h5><div class="ico ico-cal"><i class="fas fa-calendar-alt"></i></div> Citas Recientes</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th>Departamento</th><th>Estado</th></tr></thead>
+                    <tbody id="tbodyCitasRecientes"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -143,7 +94,7 @@
     <!-- DEPARTAMENTOS -->
     <div id="departamentos" class="tab-content" style="display:none;">
         <div class="filter-section">
-            <button class="btn btn-primary-custom" onclick="cargarDepartamentos()"><i class="fas fa-sync-alt"></i> Refrescar</button>
+            <button class="btn btn-primary" onclick="cargarDepartamentos()"><i class="fas fa-sync-alt"></i> Refrescar</button>
         </div>
         <div class="row" id="departamentosContainer"></div>
     </div>
@@ -151,9 +102,9 @@
     <!-- PERSONAL -->
     <div id="personal" class="tab-content" style="display:none;">
         <div class="filter-section">
-            <div class="row">
+            <div class="row g-2 align-items-end">
                 <div class="col-md-4">
-                    <button class="btn btn-primary-custom" onclick="abrirModalUsuario()"><i class="fas fa-user-plus"></i> Nuevo Usuario</button>
+                    <button class="btn btn-primary w-100" onclick="abrirModalUsuario()"><i class="fas fa-user-plus"></i> Nuevo Usuario</button>
                 </div>
                 <div class="col-md-4">
                     <select id="filtroDepartamentoPersonal" class="form-select">
@@ -182,10 +133,12 @@
             </div>
         </div>
         <div class="table-container">
-            <table class="table table-hover">
-                <thead><tr><th>ID</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Departamento</th><th>Especialidad</th><th>Acciones</th></tr></thead>
-                <tbody id="tbodyPersonal"></tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>ID</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Departamento</th><th>Especialidad</th><th>Acciones</th></tr></thead>
+                    <tbody id="tbodyPersonal"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -194,18 +147,18 @@
         <div class="row">
             <div class="col-md-6">
                 <div class="table-container">
-                    <h5><i class="fas fa-file-pdf"></i> Reportes PDF</h5>
-                    <div class="row">
-                        <div class="col-md-6"><input type="date" id="reporteInicio" class="form-control mb-2"></div>
-                        <div class="col-md-6"><input type="date" id="reporteFin" class="form-control mb-2"></div>
+                    <h5><div class="ico ico-rojo"><i class="fas fa-file-pdf"></i></div> Reportes PDF</h5>
+                    <div class="row g-2">
+                        <div class="col-md-6"><input type="date" id="reporteInicio" class="form-control"></div>
+                        <div class="col-md-6"><input type="date" id="reporteFin" class="form-control"></div>
                     </div>
-                    <button onclick="exportarPDFDirector()" class="btn btn-danger w-100">Generar Reporte</button>
+                    <button onclick="exportarPDFDirector()" class="btn btn-danger w-100 mt-3"><i class="fas fa-file-pdf"></i> Generar Reporte</button>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6 mt-3 mt-md-0">
                 <div class="table-container">
-                    <h5><i class="fas fa-database"></i> Respaldo de Base de Datos</h5>
-                    <p class="text-muted">Respaldos automáticos diarios a las 2:00 AM</p>
+                    <h5><div class="ico ico-azul"><i class="fas fa-database"></i></div> Respaldo de Base de Datos</h5>
+                    <p class="text-muted mb-2">Respaldos automáticos diarios a las 2:00 AM</p>
                     <button onclick="realizarBackupManual()" class="btn btn-backup"><i class="fas fa-download"></i> Realizar Backup Manual</button>
                 </div>
             </div>
@@ -217,21 +170,21 @@
 <div class="modal fade" id="usuarioModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-user-plus"></i> Nuevo Usuario</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i> Nuevo Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">Nombre completo</label>
+                    <label class="form-label">Nombre completo *</label>
                     <input type="text" id="nuevoNombreCompleto" class="form-control" placeholder="Nombre completo">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Usuario</label>
+                    <label class="form-label">Usuario *</label>
                     <input type="text" id="nuevoUsername" class="form-control" placeholder="Usuario">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Contraseña</label>
+                    <label class="form-label">Contraseña *</label>
                     <input type="password" id="nuevoPassword" class="form-control" placeholder="Contraseña">
                 </div>
                 <div class="mb-3">
@@ -243,7 +196,7 @@
                     <input type="email" id="nuevoCorreo" class="form-control" placeholder="Correo">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Rol</label>
+                    <label class="form-label">Rol *</label>
                     <select id="nuevoRol" class="form-select mb-2">
                         <option value="DIRECTOR">DIRECTOR</option>
                         <option value="JEFE_PSICOLOGIA">JEFE DE PSICOLOGÍA</option>
@@ -296,4 +249,4 @@
 <script src="/js/auth.js"></script>
 <script src="/js/director.js"></script>
 </body>
-</html> 
+</html>
